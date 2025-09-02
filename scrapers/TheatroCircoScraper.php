@@ -1,5 +1,5 @@
 <?php
-class TeatroCircoScraper extends BaseScraper {
+class TheatroCircoScraper extends BaseScraper {
     
     public function scrape() {
         $eventsScraped = 0;
@@ -42,7 +42,7 @@ class TeatroCircoScraper extends BaseScraper {
                             $category ?: 'Cultura', 
                             $image,
                             $eventUrl,
-                            'Teatro Circo',
+                            'Theatro Circo',
                             $dateInfo['start_date'],
                             $dateInfo['end_date']
                         )) {
@@ -205,7 +205,7 @@ class TeatroCircoScraper extends BaseScraper {
         if ($parent) {
             $text = strtolower($parent->textContent);
             
-            // Common Teatro Circo categories
+            // Common Theatro Circo categories
             $categories = [
                 'teatro' => 'Teatro',
                 'música' => 'Música', 

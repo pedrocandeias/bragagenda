@@ -83,7 +83,7 @@ if ($_POST) {
 
             <div class="form-group">
                 <label for="location">Local</label>
-                <input type="text" id="location" name="location" value="<?= htmlspecialchars($event['location'] ?? '') ?>" placeholder="ex: Gnration, Teatro Circo">
+                <input type="text" id="location" name="location" value="<?= htmlspecialchars($event['location'] ?? '') ?>" placeholder="ex: Gnration, Theatro Circo">
             </div>
 
             <div class="form-group">

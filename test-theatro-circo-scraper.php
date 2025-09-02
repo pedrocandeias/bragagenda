@@ -3,24 +3,24 @@ require_once 'config.php';
 require_once 'includes/Database.php';
 require_once 'scrapers/ScraperManager.php';
 require_once 'scrapers/BaseScraper.php';
-require_once 'scrapers/TeatroCircoScraper.php';
+require_once 'scrapers/TheatroCircoScraper.php';
 
-echo "Testing Teatro Circo scraper...\n\n";
+echo "Testing Theatro Circo scraper...\n\n";
 
 $db = new Database();
 
-// Get Teatro Circo source from database
-$stmt = $db->getConnection()->prepare("SELECT * FROM sources WHERE scraper_class = 'TeatroCircoScraper' LIMIT 1");
+// Get Theatro Circo source from database
+$stmt = $db->getConnection()->prepare("SELECT * FROM sources WHERE scraper_class = 'TheatroCircoScraper' LIMIT 1");
 $stmt->execute();
 $source = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$source) {
-    echo "❌ Teatro Circo source not found. Run setup-teatro-circo-scraper.php first.\n";
+    echo "❌ Theatro Circo source not found. Run setup-theatro-circo-scraper.php first.\n";
     exit(1);
 }
 
 // Test the scraper
-$scraper = new TeatroCircoScraper($db, $source['id']);
+$scraper = new TheatroCircoScraper($db, $source['id']);
 $result = $scraper->scrape();
 
 echo "=== SCRAPER RESULTS ===\n";

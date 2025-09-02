@@ -1,5 +1,5 @@
 <?php
-echo "Debug Teatro Circo Website Structure\n";
+echo "Debug Theatro Circo Website Structure\n";
 echo "===================================\n\n";
 
 $url = "https://www.theatrocirco.com/pt/agendaebilheteira";

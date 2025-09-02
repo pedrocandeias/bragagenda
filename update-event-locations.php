@@ -35,7 +35,7 @@ echo "\n2. Mapping sources to locations...\n";
 // Define location mappings based on source
 $locationMappings = [
     'GnrationScraper' => 'Gnration',
-    'TeatroCircoScraper' => 'Teatro Circo'
+    'TheatroCircoScraper' => 'Theatro Circo'
 ];
 
 $updated = 0;
