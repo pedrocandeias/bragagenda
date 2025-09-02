@@ -1,0 +1,32 @@
+Braga Agenda v1.0.0
+
+Release Date: January 2025
+
+Features:
+- Event aggregation system for Braga city
+- Minimalistic black & white design
+- Month navigation and category filtering
+- Simple CMS for event management
+- Gnration scraper for automatic event collection
+- SQLite database for easy deployment
+- Multi-installer support (web + CLI)
+
+Requirements:
+- PHP 7.4+
+- SQLite3 PDO support
+- Web server (Apache/Nginx)
+
+Installation:
+- Web installer: visit install.php
+- CLI installer: bash install.sh
+- Manual setup: follow INSTALL.md
+
+Components:
+- Public site (index.php)
+- Admin panel (admin/)
+- Scraper framework (scrapers/)
+- Gnration event scraper
+- Sample data and documentation
+
+Author: Claude Code Assistant
+License: Open Source
