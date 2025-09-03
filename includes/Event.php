@@ -6,7 +6,7 @@ class Event {
         $this->db = $database->getConnection();
     }
     
-    public function getEventsByMonth($year, $month, $location = '', $category = '') {
+    public function getEventsByMonth($year, $month, $location = '', $category = '', $limit = null, $offset = 0) {
         $startDate = sprintf('%04d-%02d-01', $year, $month);
         $endDate = date('Y-m-t', strtotime($startDate));
         
@@ -29,9 +29,38 @@ class Event {
         
         $sql .= " ORDER BY event_date ASC";
         
+        if ($limit) {
+            $sql .= " LIMIT ? OFFSET ?";
+            $params[] = $limit;
+            $params[] = $offset;
+        }
+        
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function getEventsCountByMonth($year, $month, $location = '', $category = '') {
+        $startDate = sprintf('%04d-%02d-01', $year, $month);
+        $endDate = date('Y-m-t', strtotime($startDate));
+        
+        $sql = "SELECT COUNT(*) FROM events 
+                WHERE DATE(event_date) BETWEEN ? AND ?";
+        $params = [$startDate, $endDate];
+        
+        if ($location) {
+            $sql .= " AND location = ?";
+            $params[] = $location;
+        }
+        
+        if ($category) {
+            $sql .= " AND category = ?";
+            $params[] = $category;
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn();
     }
     
     public function getAllCategories() {

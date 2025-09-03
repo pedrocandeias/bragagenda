@@ -21,7 +21,7 @@ class EspacoVitaScraper extends BaseScraper {
             $xpath = new DOMXPath($dom);
             
             // Find all event containers
-            $eventNodes = $xpath->query('//div[@class="listEventoSingle"]');
+            $eventNodes = $xpath->query('//div[contains(@class, "listEventoSingle")]');
             
             foreach ($eventNodes as $eventNode) {
                 try {

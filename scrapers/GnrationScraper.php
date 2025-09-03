@@ -42,19 +42,24 @@ class GnrationScraper extends BaseScraper {
                         // Try to extract image
                         $image = $this->extractEventImage($eventUrl);
                         
-                        // Save event with date range support
-                        if ($this->saveEvent(
-                            $title, 
-                            $description, 
-                            $dateInfo['date'], 
-                            $category ?: 'Cultura', 
-                            $image,
-                            $eventUrl,
-                            'Gnration',
-                            $dateInfo['start_date'],
-                            $dateInfo['end_date']
-                        )) {
-                            $eventsScraped++;
+                        // Handle multiple categories by creating separate events
+                        $categories = $this->splitCategories($category ?: 'Cultura');
+                        
+                        foreach ($categories as $singleCategory) {
+                            // Save event with date range support
+                            if ($this->saveEvent(
+                                $title, 
+                                $description, 
+                                $dateInfo['date'], 
+                                $singleCategory, 
+                                $image,
+                                $eventUrl,
+                                'Gnration',
+                                $dateInfo['start_date'],
+                                $dateInfo['end_date']
+                            )) {
+                                $eventsScraped++;
+                            }
                         }
                     }
                     
@@ -277,6 +282,25 @@ class GnrationScraper extends BaseScraper {
         return 'Cultura';
     }
     
+    private function splitCategories($categoryString) {
+        if (!$categoryString) {
+            return ['Cultura'];
+        }
+        
+        // Split by common separators: / | , and
+        $categories = preg_split('/\s*[\/\|,]\s*|\s+e\s+|\s+and\s+/i', $categoryString);
+        
+        $normalizedCategories = [];
+        foreach ($categories as $category) {
+            $category = trim($category);
+            if (!empty($category)) {
+                $normalizedCategories[] = $this->normalizeCategory($category);
+            }
+        }
+        
+        return empty($normalizedCategories) ? ['Cultura'] : array_unique($normalizedCategories);
+    }
+    
     private function normalizeCategory($category) {
         $category = trim(strtolower($category));
         
@@ -304,6 +328,10 @@ class GnrationScraper extends BaseScraper {
             'conferência' => 'Conferência',
             'conferencia' => 'Conferência',
             'talk' => 'Conferência',
+            'conversa' => 'Conversa',
+            'discussão' => 'Conversa',
+            'discussao' => 'Conversa',
+            'debate' => 'Conversa',
             'arte' => 'Arte',
             'art' => 'Arte'
         ];
