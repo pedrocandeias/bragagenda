@@ -80,26 +80,29 @@ function formatEventDate($event) {
     $startTimestamp = strtotime($startDate);
     $endTimestamp = strtotime($endDate);
     
-    // If same date, show single date with time (if not midnight)
-    if (date('Y-m-d', $startTimestamp) === date('Y-m-d', $endTimestamp)) {
-        $time = date('H:i', $startTimestamp);
-        if ($time !== '00:00') {
-            return date('d/m/Y') . ' - ' . $time;
-        } else {
-            return date('d/m/Y', $startTimestamp);
-        }
-    }
-    
-    // Different dates - show range
-    $startFormatted = date('d M Y', $startTimestamp);
-    $endFormatted = date('d M Y', $endTimestamp);
-    
     // Portuguese month names
     $monthMap = [
         'Jan' => 'Jan', 'Feb' => 'Fev', 'Mar' => 'Mar', 'Apr' => 'Abr',
         'May' => 'Mai', 'Jun' => 'Jun', 'Jul' => 'Jul', 'Aug' => 'Ago',
         'Sep' => 'Set', 'Oct' => 'Out', 'Nov' => 'Nov', 'Dec' => 'Dez'
     ];
+    
+    // If same date, show single date with time (if not midnight)
+    if (date('Y-m-d', $startTimestamp) === date('Y-m-d', $endTimestamp)) {
+        $dateFormatted = date('j M Y', $startTimestamp);
+        $dateFormatted = str_replace(array_keys($monthMap), array_values($monthMap), $dateFormatted);
+        
+        $time = date('H:i', $startTimestamp);
+        if ($time !== '00:00') {
+            return $dateFormatted . ' - ' . $time;
+        } else {
+            return $dateFormatted;
+        }
+    }
+    
+    // Different dates - show range
+    $startFormatted = date('j M Y', $startTimestamp);
+    $endFormatted = date('j M Y', $endTimestamp);
     
     foreach ($monthMap as $en => $pt) {
         $startFormatted = str_replace($en, $pt, $startFormatted);
@@ -110,6 +113,12 @@ function formatEventDate($event) {
     if (date('Y-m', $startTimestamp) === date('Y-m', $endTimestamp)) {
         $startDay = date('j', $startTimestamp);
         $endDay = date('j', $endTimestamp);
+        
+        // If start and end day are the same, show just one date
+        if ($startDay === $endDay) {
+            return $startFormatted;
+        }
+        
         $monthYear = date('M Y', $startTimestamp);
         $monthYear = str_replace(array_keys($monthMap), array_values($monthMap), $monthYear);
         return "$startDay a $endDay $monthYear";
@@ -213,7 +222,14 @@ function formatEventDate($event) {
                                              style="height: 200px; object-fit: cover;">
                                     <?php endif; ?>
                                     <div class="card-body d-flex flex-column">
-                                        <h5 class="card-title"><?= htmlspecialchars($event['title']) ?></h5>
+                                        <h5 class="card-title">
+                                            <?= htmlspecialchars($event['title']) ?>
+                                            <?php if (!empty($event['featured'])): ?>
+                                                <span class="badge bg-warning text-dark ms-2">
+                                                    <i class="bi bi-star-fill"></i> Destaque
+                                                </span>
+                                            <?php endif; ?>
+                                        </h5>
                                         
                                         <div class="mb-3">
                                             <small class="text-muted d-block">
@@ -268,7 +284,14 @@ function formatEventDate($event) {
                                     <?php endif; ?>
                                     <div class="col">
                                         <div class="d-flex w-100 justify-content-between">
-                                            <h5 class="mb-1"><?= htmlspecialchars($event['title']) ?></h5>
+                                            <h5 class="mb-1">
+                                                <?= htmlspecialchars($event['title']) ?>
+                                                <?php if (!empty($event['featured'])): ?>
+                                                    <span class="badge bg-warning text-dark ms-2">
+                                                        <i class="bi bi-star-fill"></i> Destaque
+                                                    </span>
+                                                <?php endif; ?>
+                                            </h5>
                                             <small class="text-muted">
                                                 <?= formatEventDate($event) ?>
                                             </small>

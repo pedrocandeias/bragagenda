@@ -14,7 +14,8 @@ class Event {
                        COALESCE(start_date, event_date) as start_date,
                        COALESCE(end_date, event_date) as end_date
                 FROM events 
-                WHERE DATE(event_date) BETWEEN ? AND ?";
+                WHERE DATE(event_date) BETWEEN ? AND ? 
+                AND (hidden IS NULL OR hidden = 0)";
         $params = [$startDate, $endDate];
         
         if ($location) {
@@ -27,7 +28,7 @@ class Event {
             $params[] = $category;
         }
         
-        $sql .= " ORDER BY event_date ASC";
+        $sql .= " ORDER BY featured DESC, event_date ASC";
         
         if ($limit) {
             $sql .= " LIMIT ? OFFSET ?";
@@ -45,7 +46,8 @@ class Event {
         $endDate = date('Y-m-t', strtotime($startDate));
         
         $sql = "SELECT COUNT(*) FROM events 
-                WHERE DATE(event_date) BETWEEN ? AND ?";
+                WHERE DATE(event_date) BETWEEN ? AND ? 
+                AND (hidden IS NULL OR hidden = 0)";
         $params = [$startDate, $endDate];
         
         if ($location) {
@@ -101,5 +103,29 @@ class Event {
     public function getAllEvents() {
         $stmt = $this->db->query("SELECT * FROM events ORDER BY event_date DESC");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function toggleHidden($id) {
+        $sql = "UPDATE events SET hidden = CASE WHEN hidden = 1 THEN 0 ELSE 1 END WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$id]);
+    }
+    
+    public function toggleFeatured($id) {
+        $sql = "UPDATE events SET featured = CASE WHEN featured = 1 THEN 0 ELSE 1 END WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$id]);
+    }
+    
+    public function setHidden($id, $hidden) {
+        $sql = "UPDATE events SET hidden = ? WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$hidden ? 1 : 0, $id]);
+    }
+    
+    public function setFeatured($id, $featured) {
+        $sql = "UPDATE events SET featured = ? WHERE id = ?";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$featured ? 1 : 0, $id]);
     }
 }

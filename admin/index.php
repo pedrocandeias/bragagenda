@@ -6,6 +6,36 @@ require_once '../includes/Event.php';
 $db = new Database();
 $eventModel = new Event($db);
 
+// Format date in Portuguese format
+function formatAdminDate($dateString) {
+    $timestamp = strtotime($dateString);
+    $formatted = date('j M Y', $timestamp);
+    
+    // Portuguese month names
+    $monthMap = [
+        'Jan' => 'Jan', 'Feb' => 'Fev', 'Mar' => 'Mar', 'Apr' => 'Abr',
+        'May' => 'Mai', 'Jun' => 'Jun', 'Jul' => 'Jul', 'Aug' => 'Ago',
+        'Sep' => 'Set', 'Oct' => 'Out', 'Nov' => 'Nov', 'Dec' => 'Dez'
+    ];
+    
+    return str_replace(array_keys($monthMap), array_values($monthMap), $formatted);
+}
+
+// Build pagination URL preserving filters
+function buildAdminUrl($page, $category = '', $location = '', $search = '', $month = 0, $year = 0) {
+    global $categoryFilter, $locationFilter, $searchFilter, $monthFilter, $yearFilter;
+    $params = [];
+    
+    if ($page > 1) $params['page'] = $page;
+    if ($category ?: $categoryFilter) $params['category'] = $category ?: $categoryFilter;
+    if ($location ?: $locationFilter) $params['location'] = $location ?: $locationFilter;
+    if ($search ?: $searchFilter) $params['search'] = $search ?: $searchFilter;
+    if ($month ?: $monthFilter) $params['month'] = $month ?: $monthFilter;
+    if ($year ?: $yearFilter) $params['year'] = $year ?: $yearFilter;
+    
+    return '?' . http_build_query($params);
+}
+
 // Handle pagination
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $eventsPerPage = 50;
@@ -13,7 +43,10 @@ $offset = ($page - 1) * $eventsPerPage;
 
 // Handle filters
 $categoryFilter = isset($_GET['category']) ? trim($_GET['category']) : '';
+$locationFilter = isset($_GET['location']) ? trim($_GET['location']) : '';
 $searchFilter = isset($_GET['search']) ? trim($_GET['search']) : '';
+$monthFilter = isset($_GET['month']) ? (int)$_GET['month'] : 0;
+$yearFilter = isset($_GET['year']) ? (int)$_GET['year'] : 0;
 
 // Build query
 $whereClause = '';
@@ -24,10 +57,27 @@ if ($categoryFilter) {
     $params[] = $categoryFilter;
 }
 
+if ($locationFilter) {
+    $whereClause .= ($whereClause ? ' AND ' : ' WHERE ') . 'location = ?';
+    $params[] = $locationFilter;
+}
+
 if ($searchFilter) {
     $whereClause .= ($whereClause ? ' AND ' : ' WHERE ') . '(title LIKE ? OR description LIKE ?)';
     $params[] = '%' . $searchFilter . '%';
     $params[] = '%' . $searchFilter . '%';
+}
+
+if ($monthFilter > 0 && $yearFilter > 0) {
+    $whereClause .= ($whereClause ? ' AND ' : ' WHERE ') . 'strftime("%Y", event_date) = ? AND strftime("%m", event_date) = ?';
+    $params[] = (string)$yearFilter;
+    $params[] = str_pad($monthFilter, 2, '0', STR_PAD_LEFT);
+} elseif ($yearFilter > 0) {
+    $whereClause .= ($whereClause ? ' AND ' : ' WHERE ') . 'strftime("%Y", event_date) = ?';
+    $params[] = (string)$yearFilter;
+} elseif ($monthFilter > 0) {
+    $whereClause .= ($whereClause ? ' AND ' : ' WHERE ') . 'strftime("%m", event_date) = ?';
+    $params[] = str_pad($monthFilter, 2, '0', STR_PAD_LEFT);
 }
 
 // Get total count
@@ -45,8 +95,9 @@ $stmt = $db->getConnection()->prepare($sql);
 $stmt->execute($params);
 $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Get all categories for filter
+// Get all categories and locations for filters
 $categories = $eventModel->getAllCategories();
+$locations = $eventModel->getAllLocations();
 
 // Handle messages
 $message = $_GET['message'] ?? '';
@@ -92,12 +143,12 @@ $messageType = $_GET['type'] ?? 'success';
             <div class="card mb-4">
                 <div class="card-body">
                     <form method="GET" class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <input type="text" name="search" class="form-control" 
                                    placeholder="Pesquisar por título ou descrição..." 
                                    value="<?= htmlspecialchars($searchFilter) ?>">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <select name="category" class="form-select">
                                 <option value="">Todas as categorias</option>
                                 <?php foreach ($categories as $category): ?>
@@ -108,11 +159,50 @@ $messageType = $_GET['type'] ?? 'success';
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        <div class="col-md-2">
+                            <select name="location" class="form-select">
+                                <option value="">Todos os locais</option>
+                                <?php foreach ($locations as $location): ?>
+                                    <option value="<?= htmlspecialchars($location) ?>" 
+                                            <?= $locationFilter === $location ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($location) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <select name="month" class="form-select">
+                                <option value="">Mês</option>
+                                <?php 
+                                $monthNames = [
+                                    1 => 'Jan', 2 => 'Fev', 3 => 'Mar', 4 => 'Abr',
+                                    5 => 'Mai', 6 => 'Jun', 7 => 'Jul', 8 => 'Ago',
+                                    9 => 'Set', 10 => 'Out', 11 => 'Nov', 12 => 'Dez'
+                                ];
+                                foreach ($monthNames as $num => $name): ?>
+                                    <option value="<?= $num ?>" <?= $monthFilter === $num ? 'selected' : '' ?>>
+                                        <?= $name ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <select name="year" class="form-select">
+                                <option value="">Ano</option>
+                                <?php 
+                                $currentYear = date('Y');
+                                for ($year = $currentYear - 1; $year <= $currentYear + 2; $year++): ?>
+                                    <option value="<?= $year ?>" <?= $yearFilter === $year ? 'selected' : '' ?>>
+                                        <?= $year ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
                         <div class="col-md-3">
                             <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-search"></i> Pesquisar
                             </button>
-                            <?php if ($categoryFilter || $searchFilter): ?>
+                            <?php if ($categoryFilter || $locationFilter || $searchFilter || $monthFilter || $yearFilter): ?>
                                 <a href="index.php" class="btn btn-outline-secondary">
                                     <i class="bi bi-x"></i> Limpar
                                 </a>
@@ -151,7 +241,8 @@ $messageType = $_GET['type'] ?? 'success';
                                             <th>Data</th>
                                             <th>Categoria</th>
                                             <th>Local</th>
-                                            <th style="width: 120px;">Ações</th>
+                                            <th>Status</th>
+                                            <th style="width: 160px;">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -170,7 +261,7 @@ $messageType = $_GET['type'] ?? 'success';
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <small><?= date('d/m/Y', strtotime($event['event_date'])) ?></small>
+                                                    <small><?= formatAdminDate($event['event_date']) ?></small>
                                                     <?php if (date('H:i', strtotime($event['event_date'])) !== '00:00'): ?>
                                                         <br><small class="text-muted"><?= date('H:i', strtotime($event['event_date'])) ?></small>
                                                     <?php endif; ?>
@@ -190,10 +281,34 @@ $messageType = $_GET['type'] ?? 'success';
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
+                                                    <?php if (!empty($event['featured'])): ?>
+                                                        <span class="badge bg-warning text-dark">
+                                                            <i class="bi bi-star-fill"></i> Destaque
+                                                        </span>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($event['hidden'])): ?>
+                                                        <span class="badge bg-secondary">
+                                                            <i class="bi bi-eye-slash"></i> Oculto
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
                                                     <div class="btn-group btn-group-sm">
                                                         <button type="button" class="btn btn-outline-primary btn-sm" 
                                                                 title="Editar" onclick="editEvent(<?= $event['id'] ?>)">
                                                             <i class="bi bi-pencil"></i>
+                                                        </button>
+                                                        <button type="button" 
+                                                                class="btn <?= !empty($event['featured']) ? 'btn-warning' : 'btn-outline-warning' ?> btn-sm" 
+                                                                title="<?= !empty($event['featured']) ? 'Remover destaque' : 'Destacar evento' ?>"
+                                                                onclick="toggleEventStatus(<?= $event['id'] ?>, 'toggle-featured')">
+                                                            <i class="bi bi-star<?= !empty($event['featured']) ? '-fill' : '' ?>"></i>
+                                                        </button>
+                                                        <button type="button" 
+                                                                class="btn <?= !empty($event['hidden']) ? 'btn-secondary' : 'btn-outline-secondary' ?> btn-sm" 
+                                                                title="<?= !empty($event['hidden']) ? 'Mostrar evento' : 'Ocultar evento' ?>"
+                                                                onclick="toggleEventStatus(<?= $event['id'] ?>, 'toggle-hidden')">
+                                                            <i class="bi bi-eye<?= !empty($event['hidden']) ? '-slash' : '' ?>"></i>
                                                         </button>
                                                         <a href="delete-event.php?id=<?= $event['id'] ?>" 
                                                            class="btn btn-outline-danger btn-sm" title="Eliminar"
@@ -218,7 +333,7 @@ $messageType = $_GET['type'] ?? 'success';
                     <ul class="pagination justify-content-center">
                         <?php if ($page > 1): ?>
                             <li class="page-item">
-                                <a class="page-link" href="?page=<?= $page - 1 ?><?= $categoryFilter ? '&category=' . urlencode($categoryFilter) : '' ?><?= $searchFilter ? '&search=' . urlencode($searchFilter) : '' ?>">
+                                <a class="page-link" href="<?= buildAdminUrl($page - 1) ?>">
                                     <i class="bi bi-chevron-left"></i>
                                 </a>
                             </li>
@@ -230,7 +345,7 @@ $messageType = $_GET['type'] ?? 'success';
                         
                         if ($startPage > 1): ?>
                             <li class="page-item">
-                                <a class="page-link" href="?page=1<?= $categoryFilter ? '&category=' . urlencode($categoryFilter) : '' ?><?= $searchFilter ? '&search=' . urlencode($searchFilter) : '' ?>">1</a>
+                                <a class="page-link" href="<?= buildAdminUrl(1) ?>">1</a>
                             </li>
                             <?php if ($startPage > 2): ?>
                                 <li class="page-item disabled">
@@ -241,7 +356,7 @@ $messageType = $_GET['type'] ?? 'success';
                         
                         <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
                             <li class="page-item <?= $i === $page ? 'active' : '' ?>">
-                                <a class="page-link" href="?page=<?= $i ?><?= $categoryFilter ? '&category=' . urlencode($categoryFilter) : '' ?><?= $searchFilter ? '&search=' . urlencode($searchFilter) : '' ?>"><?= $i ?></a>
+                                <a class="page-link" href="<?= buildAdminUrl($i) ?>"><?= $i ?></a>
                             </li>
                         <?php endfor; ?>
                         
@@ -252,13 +367,13 @@ $messageType = $_GET['type'] ?? 'success';
                                 </li>
                             <?php endif; ?>
                             <li class="page-item">
-                                <a class="page-link" href="?page=<?= $totalPages ?><?= $categoryFilter ? '&category=' . urlencode($categoryFilter) : '' ?><?= $searchFilter ? '&search=' . urlencode($searchFilter) : '' ?>"><?= $totalPages ?></a>
+                                <a class="page-link" href="<?= buildAdminUrl($totalPages) ?>"><?= $totalPages ?></a>
                             </li>
                         <?php endif; ?>
                         
                         <?php if ($page < $totalPages): ?>
                             <li class="page-item">
-                                <a class="page-link" href="?page=<?= $page + 1 ?><?= $categoryFilter ? '&category=' . urlencode($categoryFilter) : '' ?><?= $searchFilter ? '&search=' . urlencode($searchFilter) : '' ?>">
+                                <a class="page-link" href="<?= buildAdminUrl($page + 1) ?>">
                                     <i class="bi bi-chevron-right"></i>
                                 </a>
                             </li>
@@ -413,6 +528,46 @@ $messageType = $_GET['type'] ?? 'success';
                 submitBtn.innerHTML = originalText;
             });
         });
+
+        // Toggle event status (hide/show, feature/unfeature)
+        function toggleEventStatus(eventId, action) {
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            
+            // Disable button and show loading
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+            
+            fetch('toggle-event-status.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: eventId,
+                    action: action
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to reflect changes
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + (data.error || 'Falha ao atualizar evento'));
+                    // Restore button
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Erro ao comunicar com o servidor');
+                // Restore button
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            });
+        }
     </script>
     
     <!-- Edit Event Modal -->

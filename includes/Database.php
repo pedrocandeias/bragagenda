@@ -51,6 +51,7 @@ class Database {
         $this->addEventHashColumn();
         $this->addLocationColumn();
         $this->addDateRangeColumns();
+        $this->addVisibilityColumns();
         
         $this->db->exec($sql);
     }
@@ -122,6 +123,35 @@ class Database {
             
             if (!$hasEndDate) {
                 $this->db->exec("ALTER TABLE events ADD COLUMN end_date DATETIME");
+            }
+        } catch (Exception $e) {
+            // Columns might already exist, ignore error
+        }
+    }
+    
+    private function addVisibilityColumns() {
+        try {
+            // Check if hidden and featured columns exist
+            $stmt = $this->db->query("PRAGMA table_info(events)");
+            $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $hasHidden = false;
+            $hasFeatured = false;
+            foreach ($columns as $column) {
+                if ($column['name'] === 'hidden') {
+                    $hasHidden = true;
+                }
+                if ($column['name'] === 'featured') {
+                    $hasFeatured = true;
+                }
+            }
+            
+            if (!$hasHidden) {
+                $this->db->exec("ALTER TABLE events ADD COLUMN hidden BOOLEAN DEFAULT 0");
+            }
+            
+            if (!$hasFeatured) {
+                $this->db->exec("ALTER TABLE events ADD COLUMN featured BOOLEAN DEFAULT 0");
             }
         } catch (Exception $e) {
             // Columns might already exist, ignore error

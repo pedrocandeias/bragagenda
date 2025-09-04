@@ -39,7 +39,14 @@ async function renderCentesimaPage() {
         }
         
         // Wait for main content to render and try different selectors
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 15000));
+        
+        // Try to wait for specific event elements to appear
+        try {
+            await page.waitForSelector('.information', { timeout: 10000 });
+        } catch (e) {
+            console.error('Event information elements not found');
+        }
         
         // Check if we have any meaningful content
         const bodyText = await page.evaluate(() => document.body.innerText);

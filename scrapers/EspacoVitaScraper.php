@@ -67,21 +67,39 @@ class EspacoVitaScraper extends BaseScraper {
     }
     
     private function extractEventTitle($xpath, $eventNode) {
-        // Look for h4 elements which contain the title
-        $titleElements = $xpath->query('.//h4', $eventNode);
+        // The title is the text that appears after the H4 (category) element
+        // We need to look for text nodes that contain the actual event name
         
-        if ($titleElements->length > 0) {
-            $title = trim($titleElements->item(0)->textContent);
-            if (strlen($title) > 3) {
-                return $title;
+        // Strategy: Find text lines and pick the one that looks like a title
+        $textContent = $eventNode->textContent;
+        $lines = array_filter(array_map('trim', explode("\n", $textContent)));
+        
+        $foundCategory = false;
+        foreach ($lines as $line) {
+            // Skip category line (h4 content)
+            if (in_array(strtolower($line), ['humor', 'música', 'teatro', 'dança', 'cinema', 'arte', 'cultura'])) {
+                $foundCategory = true;
+                continue;
+            }
+            
+            // After finding category, the next substantial line should be the title
+            if ($foundCategory && strlen($line) > 3 && strlen($line) < 100) {
+                // Skip if it looks like a person name (contains lowercase words that suggest it's an artist)
+                $lowerLine = strtolower($line);
+                if (!preg_match('/\bc\/\b|\bcom\b|\bde\b|\be\b|\bda\b|\bdo\b/', $lowerLine) && 
+                    !preg_match('/auditório|palco|sala/', $lowerLine) &&
+                    !preg_match('/segunda|terça|quarta|quinta|sexta|sábado|domingo/', $lowerLine) &&
+                    !preg_match('/\d+h\d+/', $lowerLine) &&
+                    !preg_match('/\d+\s*(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/', $lowerLine)) {
+                    return $line;
+                }
             }
         }
         
-        // Fallback: look for any heading element
-        $headingElements = $xpath->query('.//h1 | .//h2 | .//h3 | .//h4 | .//h5', $eventNode);
-        
-        foreach ($headingElements as $heading) {
-            $title = trim($heading->textContent);
+        // Fallback: use h3 if no better title found (this might be the artist name)
+        $h3Elements = $xpath->query('.//h3', $eventNode);
+        if ($h3Elements->length > 0) {
+            $title = trim($h3Elements->item(0)->textContent);
             if (strlen($title) > 3) {
                 return $title;
             }
@@ -117,8 +135,8 @@ class EspacoVitaScraper extends BaseScraper {
         // Look for date information in various possible containers
         $fullText = $eventNode->textContent;
         
-        // Try to find Portuguese day names and dates
-        // Pattern: "sábado, 20 setembro" or "20 setembro 2025"
+        // Try to find Portuguese day names and dates with time
+        // Pattern: "quarta, 24 setembro" followed by "21h30"
         if (preg_match('/(segunda|terça|quarta|quinta|sexta|sábado|domingo),?\s*(\d{1,2})\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(\s+(\d{4}))?/i', $fullText, $matches)) {
             $day = $matches[2];
             $month = $matches[3];
@@ -131,7 +149,19 @@ class EspacoVitaScraper extends BaseScraper {
                 $year = date('Y') + 1;
             }
             
-            $dateText = "$day de $month $year";
+            // Look for time in format "21h30" or "21h00"
+            $hour = 20; // Default
+            $minute = 0; // Default
+            
+            if (preg_match('/(\d{1,2})h(\d{2})/', $fullText, $timeMatches)) {
+                $hour = intval($timeMatches[1]);
+                $minute = intval($timeMatches[2]);
+            } elseif (preg_match('/(\d{1,2})h/', $fullText, $timeMatches)) {
+                $hour = intval($timeMatches[1]);
+                $minute = 0;
+            }
+            
+            $dateText = "$day de $month $year $hour:$minute";
             $parsedDate = $this->parsePortugueseDate($dateText);
             
             return [
@@ -142,7 +172,7 @@ class EspacoVitaScraper extends BaseScraper {
             ];
         }
         
-        // Try simpler pattern: "20 setembro"
+        // Try simpler pattern: "20 setembro" with time
         if (preg_match('/(\d{1,2})\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(\s+(\d{4}))?/i', $fullText, $matches)) {
             $day = $matches[1];
             $month = $matches[2];
@@ -155,7 +185,19 @@ class EspacoVitaScraper extends BaseScraper {
                 $year = date('Y') + 1;
             }
             
-            $dateText = "$day de $month $year";
+            // Look for time in format "21h30" or "21h00"
+            $hour = 20; // Default
+            $minute = 0; // Default
+            
+            if (preg_match('/(\d{1,2})h(\d{2})/', $fullText, $timeMatches)) {
+                $hour = intval($timeMatches[1]);
+                $minute = intval($timeMatches[2]);
+            } elseif (preg_match('/(\d{1,2})h/', $fullText, $timeMatches)) {
+                $hour = intval($timeMatches[1]);
+                $minute = 0;
+            }
+            
+            $dateText = "$day de $month $year $hour:$minute";
             $parsedDate = $this->parsePortugueseDate($dateText);
             
             return [
@@ -180,12 +222,21 @@ class EspacoVitaScraper extends BaseScraper {
     }
     
     private function extractCategory($xpath, $eventNode) {
+        // Look for h4 elements which contain the category
+        $categoryElements = $xpath->query('.//h4', $eventNode);
+        
+        if ($categoryElements->length > 0) {
+            $category = trim($categoryElements->item(0)->textContent);
+            if ($category && strlen($category) < 50) {
+                return $this->normalizeCategory($category);
+            }
+        }
+        
         // Look for category elements - could be in various places
         $categorySelectors = [
             './/*[contains(@class, "categoria")]',
             './/*[contains(@class, "category")]',
             './/*[contains(@class, "tipo")]',
-            './/div[1]', // First div might contain category
         ];
         
         foreach ($categorySelectors as $selector) {
@@ -305,36 +356,6 @@ class EspacoVitaScraper extends BaseScraper {
         return null;
     }
     
-    private function parsePortugueseDate($dateString) {
-        if (!$dateString) return null;
-        
-        $months = [
-            'janeiro' => '01', 'fevereiro' => '02', 'março' => '03', 'abril' => '04',
-            'maio' => '05', 'junho' => '06', 'julho' => '07', 'agosto' => '08',
-            'setembro' => '09', 'outubro' => '10', 'novembro' => '11', 'dezembro' => '12'
-        ];
-        
-        $dateString = strtolower(trim($dateString));
-        
-        // Pattern: "20 de setembro 2025"
-        if (preg_match('/(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/', $dateString, $matches)) {
-            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
-            $monthName = $matches[2];
-            $year = $matches[3];
-            
-            $month = '01';
-            foreach ($months as $name => $num) {
-                if (strpos($monthName, $name) === 0 || strpos($name, $monthName) === 0) {
-                    $month = $num;
-                    break;
-                }
-            }
-            
-            return "$year-$month-$day 20:00:00"; // Default to 8 PM
-        }
-        
-        return null;
-    }
     
     private function isValidImageUrl($url) {
         if (!$url) return false;
@@ -356,5 +377,55 @@ class EspacoVitaScraper extends BaseScraper {
         }
         
         return false;
+    }
+    
+    private function parsePortugueseDate($dateString) {
+        if (!$dateString) return null;
+        
+        $months = [
+            'janeiro' => '01', 'fevereiro' => '02', 'março' => '03', 'abril' => '04',
+            'maio' => '05', 'junho' => '06', 'julho' => '07', 'agosto' => '08',
+            'setembro' => '09', 'outubro' => '10', 'novembro' => '11', 'dezembro' => '12'
+        ];
+        
+        $dateString = strtolower(trim($dateString));
+        
+        // Pattern: "15 de janeiro 2025 21:30" (with time)
+        if (preg_match('/(\d{1,2})\s+de\s+(\w+)\s+(\d{4})\s+(\d{1,2}):(\d{2})/', $dateString, $matches)) {
+            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $monthName = $matches[2];
+            $year = $matches[3];
+            $hour = str_pad($matches[4], 2, '0', STR_PAD_LEFT);
+            $minute = $matches[5];
+            
+            $month = '01';
+            foreach ($months as $name => $num) {
+                if (strpos($monthName, $name) === 0 || strpos($name, $monthName) === 0) {
+                    $month = $num;
+                    break;
+                }
+            }
+            
+            return "$year-$month-$day $hour:$minute:00";
+        }
+        
+        // Pattern: "15 de janeiro 2025" (without specific time)
+        if (preg_match('/(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/', $dateString, $matches)) {
+            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $monthName = $matches[2];
+            $year = $matches[3];
+            
+            $month = '01';
+            foreach ($months as $name => $num) {
+                if (strpos($monthName, $name) === 0 || strpos($name, $monthName) === 0) {
+                    $month = $num;
+                    break;
+                }
+            }
+            
+            return "$year-$month-$day 20:00:00"; // Default to 8:00 PM
+        }
+        
+        return null;
     }
 }

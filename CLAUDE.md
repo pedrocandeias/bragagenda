@@ -121,6 +121,8 @@ Events can have date ranges stored in `start_date` and `end_date` fields, with `
 - **GnrationScraper**: Events from Gnration venue with multi-category support
 - **EspacoVitaScraper**: Events from Espaço Vita venue  
 - **TheatroCircoScraper**: Events from Theatro Circo venue (note: correct spelling with 'h')
+- **CentesimaScraper**: Events from Centésima venue with Firebase image extraction
+- **ForumBragaScraper**: Events from Forum Braga venue with multiple show categories
 
 ### Testing Approach
 Each scraper has a corresponding test file in `tests/` that verifies functionality and displays recent events from the database.

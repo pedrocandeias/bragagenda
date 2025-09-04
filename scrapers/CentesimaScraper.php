@@ -413,9 +413,14 @@ class CentesimaScraper extends BaseScraper {
     }
     
     private function extractEventImage($xpath, $eventNode) {
+        // Look for images in the event node and nearby elements
         $imageSelectors = [
             './/img/@src',
             './/img/@data-src',
+            './preceding-sibling::div[contains(@class, "cover-event")]//img/@src',
+            './following-sibling::div[contains(@class, "cover-event")]//img/@src', 
+            '../div[contains(@class, "cover-event")]//img/@src',
+            './ancestor::div[contains(@class, "row")]//div[contains(@class, "cover-event")]//img/@src',
         ];
         
         foreach ($imageSelectors as $selector) {
@@ -424,6 +429,28 @@ class CentesimaScraper extends BaseScraper {
                 $imageSrc = $nodes->item(0)->nodeValue;
                 
                 if ($imageSrc && $this->isValidImageUrl($imageSrc)) {
+                    // Make absolute URL if needed
+                    if (strpos($imageSrc, 'http') !== 0) {
+                        if (strpos($imageSrc, '//') === 0) {
+                            return 'https:' . $imageSrc;
+                        } elseif (strpos($imageSrc, '/') === 0) {
+                            return 'https://centesima.com' . $imageSrc;
+                        } else {
+                            return 'https://centesima.com/' . $imageSrc;
+                        }
+                    }
+                    return $imageSrc;
+                }
+            }
+        }
+        
+        // Also check for background images in style attributes
+        $styleNodes = $xpath->query('.//*[@style]', $eventNode);
+        foreach ($styleNodes as $styleNode) {
+            $style = $styleNode->getAttribute('style');
+            if (preg_match('/background-image:\s*url\((["\']?)([^"\']+)\1\)/i', $style, $matches)) {
+                $imageSrc = $matches[2];
+                if ($this->isValidImageUrl($imageSrc)) {
                     // Make absolute URL if needed
                     if (strpos($imageSrc, 'http') !== 0) {
                         if (strpos($imageSrc, '//') === 0) {
@@ -511,13 +538,33 @@ class CentesimaScraper extends BaseScraper {
     private function isValidImageUrl($url) {
         if (!$url) return false;
         
-        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+        // Skip very small or placeholder images  
+        if (strpos($url, 'data:image') === 0 && strlen($url) < 100) {
+            return false;
+        }
+        
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff'];
         $lowerUrl = strtolower($url);
         
+        // Check for image extensions
         foreach ($imageExtensions as $ext) {
             if (strpos($lowerUrl, '.' . $ext) !== false) {
                 return true;
             }
+        }
+        
+        // Also allow data: URLs for base64 encoded images
+        if (strpos($lowerUrl, 'data:image') === 0) {
+            return true;
+        }
+        
+        // Allow URLs that might be dynamically generated images (common in CMSs)
+        if (strpos($lowerUrl, '/image') !== false || 
+            strpos($lowerUrl, '/img') !== false ||
+            strpos($lowerUrl, '/asset') !== false ||
+            strpos($lowerUrl, '/media') !== false ||
+            strpos($lowerUrl, '/upload') !== false) {
+            return true;
         }
         
         return false;
