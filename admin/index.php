@@ -124,6 +124,9 @@ $messageType = $_GET['type'] ?? 'success';
                     <a href="categories.php" class="btn btn-outline-secondary">
                         <i class="bi bi-tags"></i> Categorias
                     </a>
+                    <a href="venues.php" class="btn btn-outline-info">
+                        <i class="bi bi-geo-alt"></i> Locais
+                    </a>
                     <a href="add-event.php" class="btn btn-success">
                         <i class="bi bi-plus-lg"></i> Adicionar evento
                     </a>

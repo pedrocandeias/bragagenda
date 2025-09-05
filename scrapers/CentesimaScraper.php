@@ -106,6 +106,7 @@ class CentesimaScraper extends BaseScraper {
                     $description = $this->extractDescription($xpath, $eventNode);
                     $image = $this->extractEventImage($xpath, $eventNode);
                     
+                    // Only process events that have both title and valid date
                     if ($title && $dateInfo['date']) {
                         // Handle multiple categories
                         $categories = $this->splitCategories($category ?: 'Cultura');
@@ -125,6 +126,8 @@ class CentesimaScraper extends BaseScraper {
                                 $eventsScraped++;
                             }
                         }
+                    } else if ($title && !$dateInfo['date']) {
+                        $errors[] = "Event '$title' skipped - no date found: " . ($dateInfo['raw'] ?? 'unknown');
                     }
                     
                 } catch (Exception $e) {
@@ -285,32 +288,58 @@ class CentesimaScraper extends BaseScraper {
     }
     
     private function extractDateInfo($xpath, $eventNode) {
-        // For now, default to current month to get events showing
-        // Real date extraction would need to find date elements in the page
-        $currentDate = date('Y-m-d H:i:s');
+        // Look for date elements in the Centésima structure
+        // The date is usually in a <div class="data"> element near the event title
         
-        // Look for date elements near the title
-        $dateNodes = $xpath->query('preceding-sibling::div[contains(@class, "data")] | following-sibling::div[contains(@class, "data")] | ../div[contains(@class, "data")]', $eventNode);
+        $dateSelectors = [
+            // Look for data div in the same parent container
+            '..//div[contains(@class, "data")]',
+            // Look for data div in preceding siblings
+            'preceding-sibling::div[contains(@class, "data")]',
+            // Look for data div in following siblings  
+            'following-sibling::div[contains(@class, "data")]',
+            // Look for data div in parent's children
+            '../div[contains(@class, "data")]',
+            // Look for data div anywhere in the same information container
+            'ancestor::div[contains(@class, "information")]//div[contains(@class, "data")]',
+            // Look for strong elements containing dates
+            '..//strong[text()[contains(., "SET") or contains(., "OUT") or contains(., "NOV") or contains(., "DEZ") or contains(., "JAN") or contains(., "FEV")]]'
+        ];
         
-        if ($dateNodes->length > 0) {
-            $dateText = trim($dateNodes->item(0)->textContent);
-            $parsedDate = $this->parseDate($dateText);
-            if ($parsedDate) {
-                return [
-                    'date' => $parsedDate,
-                    'start_date' => $parsedDate,
-                    'end_date' => $parsedDate,
-                    'raw' => $dateText
-                ];
+        foreach ($dateSelectors as $selector) {
+            $dateNodes = $xpath->query($selector, $eventNode);
+            if ($dateNodes->length > 0) {
+                $dateText = trim($dateNodes->item(0)->textContent);
+                $parsedDate = $this->parsePortugueseDate($dateText);
+                if ($parsedDate) {
+                    return [
+                        'date' => $parsedDate['start'],
+                        'start_date' => $parsedDate['start'], 
+                        'end_date' => $parsedDate['end'],
+                        'raw' => $dateText
+                    ];
+                }
             }
         }
         
-        // Default to current month for now
+        // If no date found, try to extract from nearby text content
+        $parentText = $eventNode->parentNode ? $eventNode->parentNode->textContent : '';
+        $parsedDate = $this->parsePortugueseDate($parentText);
+        if ($parsedDate) {
+            return [
+                'date' => $parsedDate['start'],
+                'start_date' => $parsedDate['start'],
+                'end_date' => $parsedDate['end'],
+                'raw' => 'From parent text'
+            ];
+        }
+        
+        // If still no date, don't create the event (return null date)
         return [
-            'date' => $currentDate,
-            'start_date' => $currentDate,
-            'end_date' => $currentDate,
-            'raw' => 'Default date'
+            'date' => null,
+            'start_date' => null,
+            'end_date' => null,
+            'raw' => 'No date found'
         ];
     }
     
@@ -495,6 +524,95 @@ class CentesimaScraper extends BaseScraper {
         $timestamp = strtotime($dateString);
         if ($timestamp && $timestamp > time() - (365 * 24 * 60 * 60)) { // Not older than 1 year
             return date('Y-m-d H:i:s', $timestamp);
+        }
+        
+        return null;
+    }
+    
+    private function parsePortugueseDate($dateText) {
+        if (!$dateText) return null;
+        
+        // Portuguese month abbreviations
+        $months = [
+            'jan' => '01', 'fev' => '02', 'mar' => '03', 'abr' => '04',
+            'mai' => '05', 'jun' => '06', 'jul' => '07', 'ago' => '08', 
+            'set' => '09', 'out' => '10', 'nov' => '11', 'dez' => '12'
+        ];
+        
+        $dateText = strtolower(trim(strip_tags($dateText)));
+        $currentYear = date('Y');
+        
+        // Pattern 1: "1 a 30 SET" (day range in same month)
+        if (preg_match('/(\d{1,2})\s+a\s+(\d{1,2})\s+(\w{3})/', $dateText, $matches)) {
+            $startDay = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $endDay = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
+            $monthAbbr = $matches[3];
+            
+            $month = $months[$monthAbbr] ?? null;
+            if ($month) {
+                $startDate = "$currentYear-$month-$startDay 20:00:00";
+                $endDate = "$currentYear-$month-$endDay 20:00:00";
+                
+                return [
+                    'start' => $startDate,
+                    'end' => $endDate
+                ];
+            }
+        }
+        
+        // Pattern 2: "15 OUT" (single day)
+        if (preg_match('/(\d{1,2})\s+(\w{3})/', $dateText, $matches)) {
+            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
+            $monthAbbr = $matches[2];
+            
+            $month = $months[$monthAbbr] ?? null;
+            if ($month) {
+                $date = "$currentYear-$month-$day 20:00:00";
+                
+                return [
+                    'start' => $date,
+                    'end' => $date
+                ];
+            }
+        }
+        
+        // Pattern 3: "SET 2024" (whole month)
+        if (preg_match('/(\w{3})\s+(\d{4})/', $dateText, $matches)) {
+            $monthAbbr = $matches[1];
+            $year = $matches[2];
+            
+            $month = $months[$monthAbbr] ?? null;
+            if ($month) {
+                $startDate = "$year-$month-01 20:00:00";
+                $endDate = "$year-$month-" . date('t', strtotime("$year-$month-01")) . " 20:00:00";
+                
+                return [
+                    'start' => $startDate,
+                    'end' => $endDate
+                ];
+            }
+        }
+        
+        // Pattern 4: Just month name "SET" (assume current year)
+        if (preg_match('/^(\w{3})$/', $dateText, $matches)) {
+            $monthAbbr = $matches[1];
+            
+            $month = $months[$monthAbbr] ?? null;
+            if ($month) {
+                $year = $currentYear;
+                // If the month is in the past, assume next year
+                if ($month < date('m')) {
+                    $year = $currentYear + 1;
+                }
+                
+                $startDate = "$year-$month-01 20:00:00";
+                $endDate = "$year-$month-" . date('t', strtotime("$year-$month-01")) . " 20:00:00";
+                
+                return [
+                    'start' => $startDate,
+                    'end' => $endDate
+                ];
+            }
         }
         
         return null;
