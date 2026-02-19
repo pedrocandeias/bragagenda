@@ -6,28 +6,34 @@ class Event {
         $this->db = $database->getConnection();
     }
     
-    public function getEventsByMonth($year, $month, $location = '', $category = '', $limit = null, $offset = 0) {
+    public function getEventsByMonth($year, $month, $location = '', $category = '', $limit = null, $offset = 0, $search = '') {
         $startDate = sprintf('%04d-%02d-01', $year, $month);
         $endDate = date('Y-m-t', strtotime($startDate));
-        
-        $sql = "SELECT *, 
+
+        $sql = "SELECT *,
                        COALESCE(start_date, event_date) as start_date,
                        COALESCE(end_date, event_date) as end_date
-                FROM events 
-                WHERE DATE(event_date) BETWEEN ? AND ? 
+                FROM events
+                WHERE DATE(event_date) BETWEEN ? AND ?
                 AND (hidden IS NULL OR hidden = 0)";
         $params = [$startDate, $endDate];
-        
+
         if ($location) {
             $sql .= " AND location = ?";
             $params[] = $location;
         }
-        
+
         if ($category) {
             $sql .= " AND category = ?";
             $params[] = $category;
         }
-        
+
+        if ($search) {
+            $sql .= " AND (title LIKE ? OR location LIKE ?)";
+            $params[] = '%' . $search . '%';
+            $params[] = '%' . $search . '%';
+        }
+
         $sql .= " ORDER BY featured DESC, event_date ASC";
         
         if ($limit) {
@@ -41,25 +47,31 @@ class Event {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
-    public function getEventsCountByMonth($year, $month, $location = '', $category = '') {
+    public function getEventsCountByMonth($year, $month, $location = '', $category = '', $search = '') {
         $startDate = sprintf('%04d-%02d-01', $year, $month);
         $endDate = date('Y-m-t', strtotime($startDate));
-        
-        $sql = "SELECT COUNT(*) FROM events 
-                WHERE DATE(event_date) BETWEEN ? AND ? 
+
+        $sql = "SELECT COUNT(*) FROM events
+                WHERE DATE(event_date) BETWEEN ? AND ?
                 AND (hidden IS NULL OR hidden = 0)";
         $params = [$startDate, $endDate];
-        
+
         if ($location) {
             $sql .= " AND location = ?";
             $params[] = $location;
         }
-        
+
         if ($category) {
             $sql .= " AND category = ?";
             $params[] = $category;
         }
-        
+
+        if ($search) {
+            $sql .= " AND (title LIKE ? OR location LIKE ?)";
+            $params[] = '%' . $search . '%';
+            $params[] = '%' . $search . '%';
+        }
+
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchColumn();

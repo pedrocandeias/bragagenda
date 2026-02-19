@@ -6,127 +6,100 @@ require_once 'includes/Event.php';
 $db = new Database();
 $eventModel = new Event($db);
 
-// Handle month navigation
+// Month navigation
 $currentMonth = isset($_GET['month']) ? (int)$_GET['month'] : date('n');
-$currentYear = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
-
-// Handle filters
-$locationFilter = isset($_GET['location']) ? trim($_GET['location']) : '';
-$categoryFilter = isset($_GET['category']) ? trim($_GET['category']) : '';
-
-// Handle pagination
-$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$eventsPerPage = 12;
-$offset = ($page - 1) * $eventsPerPage;
-
-// Handle view mode
-$viewMode = isset($_GET['view']) && in_array($_GET['view'], ['list', 'mosaic']) ? $_GET['view'] : 'mosaic';
-
-// Validate month/year
+$currentYear  = isset($_GET['year'])  ? (int)$_GET['year']  : date('Y');
 if ($currentMonth < 1 || $currentMonth > 12) $currentMonth = date('n');
 if ($currentYear < 2020 || $currentYear > 2030) $currentYear = date('Y');
 
-// Get total events count for pagination
-$totalEvents = $eventModel->getEventsCountByMonth($currentYear, $currentMonth, $locationFilter, $categoryFilter);
-$totalPages = ceil($totalEvents / $eventsPerPage);
+// Filters
+$locationFilter = isset($_GET['location']) ? trim($_GET['location']) : '';
+$categoryFilter = isset($_GET['category']) ? trim($_GET['category']) : '';
+$searchQuery    = isset($_GET['q'])        ? trim($_GET['q'])        : '';
+$viewMode       = isset($_GET['view']) && in_array($_GET['view'], ['list', 'grid']) ? $_GET['view'] : 'grid';
 
-$events = $eventModel->getEventsByMonth($currentYear, $currentMonth, $locationFilter, $categoryFilter, $eventsPerPage, $offset);
-$locations = $eventModel->getAllLocations();
-$categories = $eventModel->getAllCategories();
+// Pagination
+$page          = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$eventsPerPage = 24;
+$offset        = ($page - 1) * $eventsPerPage;
 
-// Navigation dates
-$prevMonth = $currentMonth - 1;
-$prevYear = $currentYear;
-if ($prevMonth < 1) {
-    $prevMonth = 12;
-    $prevYear--;
-}
+// Data
+$totalEvents = $eventModel->getEventsCountByMonth($currentYear, $currentMonth, $locationFilter, $categoryFilter, $searchQuery);
+$totalPages  = ceil($totalEvents / $eventsPerPage);
+$events      = $eventModel->getEventsByMonth($currentYear, $currentMonth, $locationFilter, $categoryFilter, $eventsPerPage, $offset, $searchQuery);
+$locations   = $eventModel->getAllLocations();
+$categories  = $eventModel->getAllCategories();
 
-$nextMonth = $currentMonth + 1;
-$nextYear = $currentYear;
-if ($nextMonth > 12) {
-    $nextMonth = 1;
-    $nextYear++;
-}
+// Month prev/next
+$prevMonth = $currentMonth - 1; $prevYear = $currentYear;
+if ($prevMonth < 1)  { $prevMonth = 12; $prevYear--; }
+$nextMonth = $currentMonth + 1; $nextYear = $currentYear;
+if ($nextMonth > 12) { $nextMonth = 1;  $nextYear++; }
 
 $monthNames = [
-    1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril',
-    5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto',
-    9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'
+    1=>'Janeiro', 2=>'Fevereiro', 3=>'Março',    4=>'Abril',
+    5=>'Maio',    6=>'Junho',     7=>'Julho',     8=>'Agosto',
+    9=>'Setembro',10=>'Outubro',  11=>'Novembro', 12=>'Dezembro',
 ];
 
-// Build query string for navigation preserving filters
-function buildNavUrl($month, $year, $location = '', $category = '', $page = 1, $view = '') {
-    global $locationFilter, $categoryFilter, $viewMode;
+function buildNavUrl($month, $year, $location = null, $category = null, $page = 1, $view = null, $search = null) {
+    global $locationFilter, $categoryFilter, $viewMode, $searchQuery;
     $params = ['month' => $month, 'year' => $year];
-    if ($location ?: $locationFilter) $params['location'] = $location ?: $locationFilter;
-    if ($category ?: $categoryFilter) $params['category'] = $category ?: $categoryFilter;
-    if ($page > 1) $params['page'] = $page;
-    if ($view ?: $viewMode) $params['view'] = $view ?: $viewMode;
+    $loc = $location !== null ? $location : $locationFilter;
+    $cat = $category !== null ? $category : $categoryFilter;
+    $v   = $view     !== null ? $view     : $viewMode;
+    $q   = $search   !== null ? $search   : $searchQuery;
+    if ($loc)      $params['location'] = $loc;
+    if ($cat)      $params['category'] = $cat;
+    if ($page > 1) $params['page']     = $page;
+    if ($v !== 'grid') $params['view'] = $v;
+    if ($q)        $params['q']        = $q;
     return '?' . http_build_query($params);
 }
 
-// Build current URL with different page
-function buildPageUrl($page) {
-    global $currentMonth, $currentYear, $locationFilter, $categoryFilter, $viewMode;
-    return buildNavUrl($currentMonth, $currentYear, $locationFilter, $categoryFilter, $page, $viewMode);
+function buildPageUrl($p) {
+    global $currentMonth, $currentYear, $locationFilter, $categoryFilter, $viewMode, $searchQuery;
+    return buildNavUrl($currentMonth, $currentYear, $locationFilter, $categoryFilter, $p, $viewMode, $searchQuery);
 }
 
-// Format date range for display
+function chipUrl($type, $value) {
+    global $currentMonth, $currentYear, $locationFilter, $categoryFilter, $viewMode, $searchQuery;
+    if ($type === 'category') {
+        $cat = ($categoryFilter === $value) ? '' : $value;
+        return buildNavUrl($currentMonth, $currentYear, $locationFilter, $cat, 1, $viewMode, $searchQuery);
+    } else {
+        $loc = ($locationFilter === $value) ? '' : $value;
+        return buildNavUrl($currentMonth, $currentYear, $loc, $categoryFilter, 1, $viewMode, $searchQuery);
+    }
+}
+
 function formatEventDate($event) {
     $startDate = $event['start_date'] ?: $event['event_date'];
-    $endDate = $event['end_date'] ?: $event['event_date'];
-    
-    $startTimestamp = strtotime($startDate);
-    $endTimestamp = strtotime($endDate);
-    
-    // Portuguese month names
-    $monthMap = [
-        'Jan' => 'Jan', 'Feb' => 'Fev', 'Mar' => 'Mar', 'Apr' => 'Abr',
-        'May' => 'Mai', 'Jun' => 'Jun', 'Jul' => 'Jul', 'Aug' => 'Ago',
-        'Sep' => 'Set', 'Oct' => 'Out', 'Nov' => 'Nov', 'Dec' => 'Dez'
+    $endDate   = $event['end_date']   ?: $event['event_date'];
+    $startTs   = strtotime($startDate);
+    $endTs     = strtotime($endDate);
+    $monthMap  = [
+        'Jan'=>'Jan','Feb'=>'Fev','Mar'=>'Mar','Apr'=>'Abr',
+        'May'=>'Mai','Jun'=>'Jun','Jul'=>'Jul','Aug'=>'Ago',
+        'Sep'=>'Set','Oct'=>'Out','Nov'=>'Nov','Dec'=>'Dez',
     ];
-    
-    // If same date, show single date with time (if not midnight)
-    if (date('Y-m-d', $startTimestamp) === date('Y-m-d', $endTimestamp)) {
-        $dateFormatted = date('j M Y', $startTimestamp);
-        $dateFormatted = str_replace(array_keys($monthMap), array_values($monthMap), $dateFormatted);
-        
-        $time = date('H:i', $startTimestamp);
-        if ($time !== '00:00') {
-            return $dateFormatted . ' - ' . $time;
-        } else {
-            return $dateFormatted;
-        }
+    if (date('Y-m-d', $startTs) === date('Y-m-d', $endTs)) {
+        $d = str_replace(array_keys($monthMap), array_values($monthMap), date('j M Y', $startTs));
+        $t = date('H:i', $startTs);
+        return $t !== '00:00' ? "$d, $t" : $d;
     }
-    
-    // Different dates - show range
-    $startFormatted = date('j M Y', $startTimestamp);
-    $endFormatted = date('j M Y', $endTimestamp);
-    
-    foreach ($monthMap as $en => $pt) {
-        $startFormatted = str_replace($en, $pt, $startFormatted);
-        $endFormatted = str_replace($en, $pt, $endFormatted);
+    $sf = str_replace(array_keys($monthMap), array_values($monthMap), date('j M Y', $startTs));
+    $ef = str_replace(array_keys($monthMap), array_values($monthMap), date('j M Y', $endTs));
+    if (date('Y-m', $startTs) === date('Y-m', $endTs)) {
+        $sd = date('j', $startTs); $ed = date('j', $endTs);
+        if ($sd === $ed) return $sf;
+        $my = str_replace(array_keys($monthMap), array_values($monthMap), date('M Y', $startTs));
+        return "$sd–$ed $my";
     }
-    
-    // If same month/year, show compact format: "18 a 31 Out 2025"
-    if (date('Y-m', $startTimestamp) === date('Y-m', $endTimestamp)) {
-        $startDay = date('j', $startTimestamp);
-        $endDay = date('j', $endTimestamp);
-        
-        // If start and end day are the same, show just one date
-        if ($startDay === $endDay) {
-            return $startFormatted;
-        }
-        
-        $monthYear = date('M Y', $startTimestamp);
-        $monthYear = str_replace(array_keys($monthMap), array_values($monthMap), $monthYear);
-        return "$startDay a $endDay $monthYear";
-    }
-    
-    // Different months/years: "18 Set 2025 a 31 Out 2025"
-    return "$startFormatted a $endFormatted";
+    return "$sf – $ef";
 }
+
+$hasFilters = $locationFilter || $categoryFilter || $searchQuery;
 ?>
 <!DOCTYPE html>
 <html lang="pt">
@@ -134,266 +107,240 @@ function formatEventDate($event) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Braga Agenda</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <div class="container-fluid">
-        <header class="py-4 border-bottom">
-            <div class="container">
-                <h1 class="text-center mb-4">Braga Agenda</h1>
-        
-                <nav class="d-flex justify-content-center align-items-center gap-4 mb-4">
-                    <a href="<?= buildNavUrl($prevMonth, $prevYear) ?>" class="btn btn-outline-dark">
-                        <i class="bi bi-chevron-left"></i>
-                    </a>
-                    <h2 class="mb-0"><?= $monthNames[$currentMonth] ?> <?= $currentYear ?></h2>
-                    <a href="<?= buildNavUrl($nextMonth, $nextYear) ?>" class="btn btn-outline-dark">
-                        <i class="bi bi-chevron-right"></i>
-                    </a>
-                </nav>
 
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <form method="GET" class="d-flex gap-3 align-items-center flex-wrap">
-                            <input type="hidden" name="month" value="<?= $currentMonth ?>">
-                            <input type="hidden" name="year" value="<?= $currentYear ?>">
-                            <input type="hidden" name="view" value="<?= $viewMode ?>">
-                            
-                            <select name="location" onchange="this.form.submit()" class="form-select form-select-sm" style="width: auto;">
-                                <option value="">Todos os locais</option>
-                                <?php foreach ($locations as $location): ?>
-                                    <option value="<?= htmlspecialchars($location) ?>" 
-                                            <?= $locationFilter === $location ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($location) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-
-                            <select name="category" onchange="this.form.submit()" class="form-select form-select-sm" style="width: auto;">
-                                <option value="">Todas as categorias</option>
-                                <?php foreach ($categories as $category): ?>
-                                    <option value="<?= htmlspecialchars($category) ?>" 
-                                            <?= $categoryFilter === $category ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($category) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-
-                            <?php if ($locationFilter || $categoryFilter): ?>
-                                <a href="<?= buildNavUrl($currentMonth, $currentYear) ?>" class="btn btn-sm btn-outline-secondary">Limpar filtros</a>
-                            <?php endif; ?>
-                        </form>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="d-flex justify-content-end">
-                            <div class="btn-group" role="group">
-                                <a href="<?= buildNavUrl($currentMonth, $currentYear, $locationFilter, $categoryFilter, $page, 'mosaic') ?>" 
-                                   class="btn <?= $viewMode === 'mosaic' ? 'btn-dark' : 'btn-outline-dark' ?> btn-sm">
-                                    <i class="bi bi-grid-3x3-gap"></i> Mosaico
-                                </a>
-                                <a href="<?= buildNavUrl($currentMonth, $currentYear, $locationFilter, $categoryFilter, $page, 'list') ?>" 
-                                   class="btn <?= $viewMode === 'list' ? 'btn-dark' : 'btn-outline-dark' ?> btn-sm">
-                                    <i class="bi bi-list"></i> Lista
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <main class="container my-4">
-            <?php if (empty($events)): ?>
-                <div class="text-center py-5">
-                    <p class="text-muted fs-5">Nenhum evento encontrado para este mês.</p>
-                </div>
-            <?php else: ?>
-                <?php if ($viewMode === 'mosaic'): ?>
-                    <div class="row g-4">
-                        <?php foreach ($events as $event): ?>
-                            <div class="col-md-6 col-lg-4">
-                                <div class="card h-100">
-                                    <?php if ($event['image']): ?>
-                                        <img src="<?= htmlspecialchars($event['image']) ?>" 
-                                             class="card-img-top" 
-                                             alt="<?= htmlspecialchars($event['title']) ?>"
-                                             style="height: 200px; object-fit: cover;">
-                                    <?php endif; ?>
-                                    <div class="card-body d-flex flex-column">
-                                        <h5 class="card-title">
-                                            <?= htmlspecialchars($event['title']) ?>
-                                            <?php if (!empty($event['featured'])): ?>
-                                                <span class="badge bg-warning text-dark ms-2">
-                                                    <i class="bi bi-star-fill"></i> Destaque
-                                                </span>
-                                            <?php endif; ?>
-                                        </h5>
-                                        
-                                        <div class="mb-3">
-                                            <small class="text-muted d-block">
-                                                <i class="bi bi-calendar"></i> 
-                                                <?= formatEventDate($event) ?>
-                                            </small>
-                                            <?php if ($event['location']): ?>
-                                                <a href="<?= buildNavUrl($currentMonth, $currentYear, $event['location'], $categoryFilter, $page, $viewMode) ?>" 
-                                                   class="badge bg-primary text-decoration-none me-1">
-                                                    <i class="bi bi-geo-alt"></i> <?= htmlspecialchars($event['location']) ?>
-                                                </a>
-                                            <?php endif; ?>
-                                            <?php if ($event['category']): ?>
-                                                <a href="<?= buildNavUrl($currentMonth, $currentYear, $locationFilter, $event['category'], $page, $viewMode) ?>" 
-                                                   class="badge bg-secondary text-decoration-none">
-                                                    <?= htmlspecialchars($event['category']) ?>
-                                                </a>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <?php if ($event['description']): ?>
-                                            <p class="card-text text-muted small flex-grow-1">
-                                                <?= htmlspecialchars(substr($event['description'], 0, 120)) ?><?= strlen($event['description']) > 120 ? '...' : '' ?>
-                                            </p>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ($event['url']): ?>
-                                            <a href="<?= htmlspecialchars($event['url']) ?>" 
-                                               target="_blank" 
-                                               rel="noopener" 
-                                               class="btn btn-outline-primary btn-sm mt-auto">
-                                                Ver mais <i class="bi bi-arrow-up-right"></i>
-                                            </a>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="list-group">
-                        <?php foreach ($events as $event): ?>
-                            <div class="list-group-item">
-                                <div class="row align-items-center">
-                                    <?php if ($event['image']): ?>
-                                        <div class="col-auto">
-                                            <img src="<?= htmlspecialchars($event['image']) ?>" 
-                                                 class="rounded" 
-                                                 alt="<?= htmlspecialchars($event['title']) ?>"
-                                                 style="width: 80px; height: 80px; object-fit: cover;">
-                                        </div>
-                                    <?php endif; ?>
-                                    <div class="col">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h5 class="mb-1">
-                                                <?= htmlspecialchars($event['title']) ?>
-                                                <?php if (!empty($event['featured'])): ?>
-                                                    <span class="badge bg-warning text-dark ms-2">
-                                                        <i class="bi bi-star-fill"></i> Destaque
-                                                    </span>
-                                                <?php endif; ?>
-                                            </h5>
-                                            <small class="text-muted">
-                                                <?= formatEventDate($event) ?>
-                                            </small>
-                                        </div>
-                                        
-                                        <div class="mb-2">
-                                            <?php if ($event['location']): ?>
-                                                <a href="<?= buildNavUrl($currentMonth, $currentYear, $event['location'], $categoryFilter, $page, $viewMode) ?>" 
-                                                   class="badge bg-primary text-decoration-none me-1">
-                                                    <i class="bi bi-geo-alt"></i> <?= htmlspecialchars($event['location']) ?>
-                                                </a>
-                                            <?php endif; ?>
-                                            <?php if ($event['category']): ?>
-                                                <a href="<?= buildNavUrl($currentMonth, $currentYear, $locationFilter, $event['category'], $page, $viewMode) ?>" 
-                                                   class="badge bg-secondary text-decoration-none">
-                                                    <?= htmlspecialchars($event['category']) ?>
-                                                </a>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <?php if ($event['description']): ?>
-                                            <p class="mb-1 text-muted"><?= htmlspecialchars($event['description']) ?></p>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ($event['url']): ?>
-                                            <a href="<?= htmlspecialchars($event['url']) ?>" 
-                                               target="_blank" 
-                                               rel="noopener" 
-                                               class="btn btn-outline-primary btn-sm">
-                                                Ver mais <i class="bi bi-arrow-up-right"></i>
-                                            </a>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-                
-                <?php if ($totalPages > 1): ?>
-                    <nav aria-label="Navegação da página" class="mt-4">
-                        <ul class="pagination justify-content-center">
-                            <?php if ($page > 1): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="<?= buildPageUrl($page - 1) ?>">
-                                        <i class="bi bi-chevron-left"></i>
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                            
-                            <?php 
-                            $startPage = max(1, $page - 2);
-                            $endPage = min($totalPages, $page + 2);
-                            
-                            if ($startPage > 1): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="<?= buildPageUrl(1) ?>">1</a>
-                                </li>
-                                <?php if ($startPage > 2): ?>
-                                    <li class="page-item disabled">
-                                        <span class="page-link">...</span>
-                                    </li>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                            
-                            <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
-                                <li class="page-item <?= $i === $page ? 'active' : '' ?>">
-                                    <a class="page-link" href="<?= buildPageUrl($i) ?>"><?= $i ?></a>
-                                </li>
-                            <?php endfor; ?>
-                            
-                            <?php if ($endPage < $totalPages): ?>
-                                <?php if ($endPage < $totalPages - 1): ?>
-                                    <li class="page-item disabled">
-                                        <span class="page-link">...</span>
-                                    </li>
-                                <?php endif; ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="<?= buildPageUrl($totalPages) ?>"><?= $totalPages ?></a>
-                                </li>
-                            <?php endif; ?>
-                            
-                            <?php if ($page < $totalPages): ?>
-                                <li class="page-item">
-                                    <a class="page-link" href="<?= buildPageUrl($page + 1) ?>">
-                                        <i class="bi bi-chevron-right"></i>
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                        </ul>
-                    </nav>
-                <?php endif; ?>
-            <?php endif; ?>
-        </main>
-
-        <footer class="text-center py-4 border-top mt-5">
-            <div class="container">
-                <p class="text-muted mb-0">Eventos agregados automaticamente</p>
-            </div>
-        </footer>
+<!-- ── Header ────────────────────────────────────────── -->
+<header class="site-header">
+    <div class="site-header-inner">
+        <div class="page-intro-inner">
+            <h1>BragAgenda</h1>
+            <p>Eventos e atividades culturais em Braga.</p>
+        </div>
+        <a href="/admin/" class="admin-link">Admin</a>
     </div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</header>
+
+<!-- ── Main layout: sidebar + content ────────────────── -->
+<div class="page-layout">
+
+    <!-- ── Sidebar ──────────────────────────────────── -->
+    <aside class="sidebar">
+
+        <!-- Month navigation -->
+        <div class="sidebar-month-nav">
+            <a href="<?= buildNavUrl($prevMonth, $prevYear, $locationFilter, $categoryFilter, 1, $viewMode, $searchQuery) ?>" class="month-nav-btn" aria-label="Mês anterior">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+            <span class="current-month-label"><?= $monthNames[$currentMonth] ?> <?= $currentYear ?></span>
+            <a href="<?= buildNavUrl($nextMonth, $nextYear, $locationFilter, $categoryFilter, 1, $viewMode, $searchQuery) ?>" class="month-nav-btn" aria-label="Próximo mês">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+
+        <!-- Search -->
+        <form method="GET" id="mainForm" action="/" class="sidebar-form">
+            <input type="hidden" name="month"    value="<?= $currentMonth ?>">
+            <input type="hidden" name="year"     value="<?= $currentYear ?>">
+            <?php if ($viewMode !== 'grid'): ?>
+            <input type="hidden" name="view"     value="<?= htmlspecialchars($viewMode) ?>">
+            <?php endif; ?>
+            <input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter) ?>">
+            <input type="hidden" name="location" value="<?= htmlspecialchars($locationFilter) ?>">
+
+            <div class="search-section">
+                <label class="search-label" for="searchInput">Pesquisar por nome ou local</label>
+                <div class="search-input-wrap">
+                    <i class="bi bi-search search-icon"></i>
+                    <input type="search" name="q" id="searchInput" class="search-input"
+                           value="<?= htmlspecialchars($searchQuery) ?>">
+                </div>
+            </div>
+        </form>
+
+        <!-- Filters -->
+        <div class="sidebar-filters">
+
+            <!-- Mobile toggle -->
+            <button class="mobile-filters-toggle" id="mobileFiltersToggle" type="button">
+                <span>Filtros</span>
+                <i class="bi bi-chevron-down"></i>
+            </button>
+
+            <div class="sidebar-filters-body" id="sidebarFiltersBody">
+
+                <?php if ($hasFilters): ?>
+                <div class="filter-clear-row">
+                    <a href="<?= buildNavUrl($currentMonth, $currentYear, '', '', 1, $viewMode, '') ?>" class="btn-clear-all">
+                        <i class="bi bi-x"></i> Limpar filtros
+                    </a>
+                </div>
+                <?php endif; ?>
+
+                <!-- Category -->
+                <div class="filter-section">
+                    <button class="filter-section-header accordion-toggle open" type="button">
+                        <span>Categoria</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <div class="filter-chips-wrap">
+                        <?php foreach ($categories as $cat): ?>
+                            <a href="<?= chipUrl('category', $cat) ?>"
+                               class="filter-chip<?= $categoryFilter === $cat ? ' selected' : '' ?>">
+                                <?= htmlspecialchars($cat) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- Location -->
+                <div class="filter-section">
+                    <button class="filter-section-header accordion-toggle open" type="button">
+                        <span>Local</span>
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <div class="filter-chips-wrap">
+                        <?php foreach ($locations as $loc): ?>
+                            <a href="<?= chipUrl('location', $loc) ?>"
+                               class="filter-chip<?= $locationFilter === $loc ? ' selected' : '' ?>">
+                                <?= htmlspecialchars($loc) ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+            </div><!-- /sidebar-filters-body -->
+        </div><!-- /sidebar-filters -->
+
+    </aside>
+
+    <!-- ── Main content ──────────────────────────────── -->
+    <main class="main-content">
+
+        <!-- Top bar: results + view toggle -->
+        <div class="controls-top">
+            <span class="results-count"><?= $totalEvents ?> resultado<?= $totalEvents != 1 ? 's' : '' ?></span>
+            <div class="view-toggle">
+                <a href="<?= buildNavUrl($currentMonth, $currentYear, $locationFilter, $categoryFilter, 1, 'grid', $searchQuery) ?>"
+                   class="view-btn<?= $viewMode === 'grid' ? ' active' : '' ?>">Grelha</a>
+                <a href="<?= buildNavUrl($currentMonth, $currentYear, $locationFilter, $categoryFilter, 1, 'list', $searchQuery) ?>"
+                   class="view-btn<?= $viewMode === 'list' ? ' active' : '' ?>">Lista</a>
+            </div>
+        </div>
+
+        <!-- Events -->
+        <?php if (empty($events)): ?>
+            <div class="no-events">
+                <p>Nenhum evento encontrado<?= $hasFilters ? ' para os filtros selecionados' : '' ?>.</p>
+                <?php if ($hasFilters): ?>
+                    <a href="<?= buildNavUrl($currentMonth, $currentYear, '', '', 1, $viewMode, '') ?>">Ver todos os eventos</a>
+                <?php endif; ?>
+            </div>
+
+        <?php else: ?>
+            <div class="<?= $viewMode === 'list' ? 'events-list' : 'events-grid' ?>">
+                <?php foreach ($events as $event): ?>
+                <article class="event-item">
+                    <a href="<?= htmlspecialchars($event['url'] ?: '#') ?>" target="_blank" rel="noopener" class="event-image-link">
+                        <div class="event-image-wrap">
+                            <img src="<?= htmlspecialchars($event['image'] ?: 'assets/placeholder-event.svg') ?>"
+                                 alt="<?= htmlspecialchars($event['title']) ?>"
+                                 class="event-img<?= $event['image'] ? '' : ' event-img--placeholder' ?>" loading="lazy">
+                            <?php if ($event['category']): ?>
+                                <span class="category-chip"><?= htmlspecialchars($event['category']) ?></span>
+                            <?php endif; ?>
+                        </div>
+                    </a>
+                    <div class="event-body">
+                        <h3 class="event-title">
+                            <a href="<?= htmlspecialchars($event['url'] ?: '#') ?>" target="_blank" rel="noopener">
+                                <?= htmlspecialchars($event['title']) ?>
+                            </a>
+                        </h3>
+                        <p class="event-meta-date">
+                            <i class="bi bi-calendar3"></i>
+                            <?= formatEventDate($event) ?>
+                        </p>
+                        <?php if ($event['location']): ?>
+                        <p class="event-meta-location">
+                            <i class="bi bi-geo-alt"></i>
+                            <a href="<?= chipUrl('location', $event['location']) ?>">
+                                <?= htmlspecialchars($event['location']) ?>
+                            </a>
+                        </p>
+                        <?php endif; ?>
+                    </div>
+                </article>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Pagination -->
+        <?php if ($totalPages > 1): ?>
+        <nav class="pagination-nav" aria-label="Navegação de páginas">
+            <?php if ($page > 1): ?>
+                <a href="<?= buildPageUrl($page - 1) ?>" class="page-link-item"><i class="bi bi-chevron-left"></i></a>
+            <?php endif; ?>
+            <?php
+            $startPage = max(1, $page - 2);
+            $endPage   = min($totalPages, $page + 2);
+            if ($startPage > 1): ?>
+                <a href="<?= buildPageUrl(1) ?>" class="page-link-item">1</a>
+                <?php if ($startPage > 2): ?><span class="page-link-item disabled">…</span><?php endif; ?>
+            <?php endif; ?>
+            <?php for ($i = $startPage; $i <= $endPage; $i++): ?>
+                <a href="<?= buildPageUrl($i) ?>" class="page-link-item<?= $i === $page ? ' active' : '' ?>"><?= $i ?></a>
+            <?php endfor; ?>
+            <?php if ($endPage < $totalPages): ?>
+                <?php if ($endPage < $totalPages - 1): ?><span class="page-link-item disabled">…</span><?php endif; ?>
+                <a href="<?= buildPageUrl($totalPages) ?>" class="page-link-item"><?= $totalPages ?></a>
+            <?php endif; ?>
+            <?php if ($page < $totalPages): ?>
+                <a href="<?= buildPageUrl($page + 1) ?>" class="page-link-item"><i class="bi bi-chevron-right"></i></a>
+            <?php endif; ?>
+        </nav>
+        <?php endif; ?>
+
+    </main>
+</div>
+
+<!-- ── Footer ─────────────────────────────────────────── -->
+<footer class="site-footer">
+    <p>Braga Agenda — Eventos agregados automaticamente</p>
+</footer>
+
+<script>
+(function () {
+    // Accordion sections
+    document.querySelectorAll('.accordion-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var wrap = btn.nextElementSibling;
+            var collapsed = wrap.classList.toggle('collapsed');
+            btn.classList.toggle('open', !collapsed);
+        });
+    });
+
+    // Mobile filters toggle
+    var mobileToggle = document.getElementById('mobileFiltersToggle');
+    var filtersBody  = document.getElementById('sidebarFiltersBody');
+    if (mobileToggle) {
+        mobileToggle.addEventListener('click', function () {
+            filtersBody.classList.toggle('open');
+            mobileToggle.classList.toggle('open');
+        });
+    }
+
+    // Auto-submit search form on Enter (native) — also submit when search cleared
+    var searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('search', function () {
+            document.getElementById('mainForm').submit();
+        });
+    }
+})();
+</script>
+
 </body>
 </html>

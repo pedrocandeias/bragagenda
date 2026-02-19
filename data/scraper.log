@@ -1,0 +1,43 @@
+[2026-02-19 10:49:29] [Centésima - Braga] OK: found=0 new=0 skipped=0 total=0 duration=0.4s
+[2026-02-19 10:49:29] [Centésima - Braga] ERROR: Centésima uses a dynamic Angular application. Manual configuration needed.
+[2026-02-19 10:49:29] [Meetup Braga] OK: found=9 new=9 skipped=0 total=18 duration=0.3s
+[2026-02-19 10:53:58] [Meetup Braga] OK: found=0 new=0 skipped=0 total=18 duration=0.8s
+[2026-02-19 10:54:26] [Centésima - Braga] OK: found=0 new=0 skipped=0 total=23 duration=0.4s
+[2026-02-19 10:54:26] [Centésima - Braga] ERROR: Centésima uses a dynamic Angular application. Manual configuration needed.
+[2026-02-19 10:57:23] [Meetup Braga] OK: found=0 new=0 skipped=0 total=18 duration=0.1s
+[2026-02-19 10:57:49] [Gnration - Braga] OK: found=4 new=4 skipped=0 total=76 duration=22.2s
+[2026-02-19 10:58:09] [Teatro Circo - Braga] OK: found=? new=0 skipped=? total=65 duration=4.9s
+[2026-02-19 10:58:20] [Teatro Circo - Braga] OK: found=? new=0 skipped=? total=65 duration=5.3s
+[2026-02-19 10:58:25] [Braga Media Arts] OK: found=0 new=0 skipped=0 total=20 duration=1.7s
+[2026-02-19 10:58:25] [Braga Media Arts] ERROR: No event links found. Website structure may have changed.
+[2026-02-19 10:58:25] [Centésima - Braga] OK: found=0 new=0 skipped=0 total=23 duration=0.4s
+[2026-02-19 10:58:25] [Centésima - Braga] ERROR: Centésima uses a dynamic Angular application. Manual configuration needed.
+[2026-02-19 10:58:29] [Conservatório de Música Calouste Gulbenkian] OK: found=0 new=0 skipped=0 total=30 duration=4.2s
+[2026-02-19 10:58:36] [Espaço Vita - Braga] OK: found=9 new=9 skipped=0 total=17 duration=6.1s
+[2026-02-19 10:58:37] [Forum Braga] OK: found=16 new=16 skipped=0 total=16 duration=1.7s
+[2026-02-19 10:58:52] [Gnration - Braga] OK: found=0 new=0 skipped=0 total=76 duration=15s
+[2026-02-19 10:58:52] [Meetup Braga] OK: found=0 new=0 skipped=0 total=18 duration=0.2s
+[2026-02-19 10:58:54] [Museu D. Diogo de Sousa] OK: found=0 new=0 skipped=0 total=40 duration=1.5s
+[2026-02-19 10:58:59] [Teatro Circo - Braga] OK: found=? new=0 skipped=? total=65 duration=4.7s
+[2026-02-19 11:04:23] [Conservatório de Música Calouste Gulbenkian] OK: found=0 new=0 skipped=0 total=30 duration=4.5s
+[2026-02-19 14:24:43] [Braga Media Arts] OK: found=0 new=0 skipped=0 total=20 duration=1.8s
+[2026-02-19 14:24:43] [Braga Media Arts] ERROR: No event links found. Website structure may have changed.
+[2026-02-19 14:25:09] [Forum Braga] OK: found=1 new=1 skipped=0 total=17 duration=23.9s
+[2026-02-19 14:25:10] [Meetup Braga] OK: found=0 new=0 skipped=0 total=18 duration=0.9s
+[2026-02-19 15:08:01] [Centésima - Braga] OK: found=0 new=0 skipped=0 total=23 duration=0.6s
+[2026-02-19 15:08:01] [Centésima - Braga] ERROR: Centésima uses a dynamic Angular application. Manual configuration needed.
+[2026-02-19 15:08:17] [Museu D. Diogo de Sousa] OK: found=2 new=2 skipped=0 total=42 duration=15.6s
+[2026-02-19 15:08:46] [Forum Braga] OK: found=0 new=0 skipped=0 total=17 duration=18.4s
+[2026-02-19 15:33:53] [Forum Braga] OK: found=0 new=0 skipped=0 total=17 duration=1.9s
+[2026-02-19 15:33:59] [Forum Braga] OK: found=0 new=0 skipped=0 total=17 duration=2s
+[2026-02-19 15:34:22] [Braga Media Arts] OK: found=0 new=0 skipped=0 total=20 duration=2s
+[2026-02-19 15:34:22] [Braga Media Arts] ERROR: No event links found. Website structure may have changed.
+[2026-02-19 15:34:22] [Centésima - Braga] OK: found=0 new=0 skipped=0 total=23 duration=0.7s
+[2026-02-19 15:34:22] [Centésima - Braga] ERROR: Centésima uses a dynamic Angular application. Manual configuration needed.
+[2026-02-19 15:34:28] [Conservatório de Música Calouste Gulbenkian] OK: found=0 new=0 skipped=0 total=30 duration=6s
+[2026-02-19 15:34:36] [Espaço Vita - Braga] OK: found=0 new=0 skipped=0 total=17 duration=7.3s
+[2026-02-19 15:34:37] [Forum Braga] OK: found=0 new=0 skipped=0 total=17 duration=1.8s
+[2026-02-19 15:34:54] [Gnration - Braga] OK: found=0 new=0 skipped=0 total=76 duration=16.5s
+[2026-02-19 15:34:55] [Meetup Braga] OK: found=0 new=0 skipped=0 total=18 duration=1s
+[2026-02-19 15:34:56] [Museu D. Diogo de Sousa] OK: found=0 new=0 skipped=0 total=42 duration=1.1s
+[2026-02-19 15:35:08] [Teatro Circo - Braga] OK: found=? new=0 skipped=? total=65 duration=12.4s

@@ -48,7 +48,7 @@ class ScraperManager {
     }
     
     public function addSource($name, $url, $scraperClass) {
-        $stmt = $this->db->getConnection()->prepare("INSERT INTO sources (name, url, scraper_class) VALUES (?, ?, ?)");
+        $stmt = $this->db->getConnection()->prepare("INSERT OR IGNORE INTO sources (name, url, scraper_class) VALUES (?, ?, ?)");
         return $stmt->execute([$name, $url, $scraperClass]);
     }
 }

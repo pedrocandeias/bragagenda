@@ -209,17 +209,17 @@ class ForumBragaScraper extends BaseScraper {
             if ($nodes->length > 0) {
                 $imageSrc = $nodes->item(0)->nodeValue;
                 if ($imageSrc && $this->isValidImageUrl($imageSrc)) {
-                    // Make absolute URL if needed
+                    // Make absolute URL
                     if (strpos($imageSrc, 'http') !== 0) {
                         if (strpos($imageSrc, '//') === 0) {
-                            return 'https:' . $imageSrc;
+                            $imageSrc = 'https:' . $imageSrc;
                         } elseif (strpos($imageSrc, '/') === 0) {
-                            return 'https://www.forumbraga.com' . $imageSrc;
+                            $imageSrc = 'https://www.forumbraga.com' . $imageSrc;
                         } else {
-                            return 'https://www.forumbraga.com/' . $imageSrc;
+                            $imageSrc = 'https://www.forumbraga.com/' . $imageSrc;
                         }
                     }
-                    return $imageSrc;
+                    return $this->downloadImage($imageSrc);
                 }
             }
         }

@@ -1,356 +1,181 @@
 <?php
 class TheatroCircoScraper extends BaseScraper {
-    
+
     public function scrape() {
         $eventsScraped = 0;
         $errors = [];
-        
+
         try {
-            $url = "https://www.theatrocirco.com/pt/agendaebilheteira";
-            $html = $this->fetchUrl($url);
-            
+            $html = $this->fetchUrl('https://theatrocirco.com/programa/');
             if (!$html) {
-                return ['error' => 'Failed to fetch URL'];
+                return ['error' => 'Failed to fetch /programa/'];
             }
-            
-            $dom = new DOMDocument();
-            libxml_use_internal_errors(true);
-            $dom->loadHTML($html);
-            libxml_clear_errors();
-            
-            $xpath = new DOMXPath($dom);
-            
-            // Find all event links within the events container
-            $eventNodes = $xpath->query('//a[contains(@href, "programacultural")]');
-            
-            foreach ($eventNodes as $eventNode) {
+
+            if (!preg_match('/TC_EVENTS\s*=\s*(\[.*?\]);\s*\n/s', $html, $m)) {
+                return ['error' => 'TC_EVENTS array not found on page'];
+            }
+
+            $tcEvents = json_decode($m[1], true);
+            if (!$tcEvents) {
+                return ['error' => 'Failed to decode TC_EVENTS JSON'];
+            }
+
+            $cutoff = strtotime('-7 days');
+
+            foreach ($tcEvents as $ev) {
+                // Skip archived (past) events — only process current programme
+                if (($ev['category'] ?? '') !== 'Agenda') continue;
+
                 try {
-                    $title = $this->extractEventTitle($xpath, $eventNode);
-                    $eventUrl = $this->extractEventUrl($xpath, $eventNode);
-                    $dateInfo = $this->extractDateInfo($xpath, $eventNode);
-                    $category = $this->extractCategory($xpath, $eventNode);
-                    $description = $this->extractDescription($xpath, $eventNode);
-                    
-                    if ($title && $dateInfo['date'] && $eventUrl) {
-                        // Try to extract image from detail page
-                        $image = $this->extractEventImage($eventUrl);
-                        
-                        if ($this->saveEvent(
-                            $title, 
-                            $description, 
-                            $dateInfo['date'], 
-                            $category ?: 'Cultura', 
-                            $image,
-                            $eventUrl,
-                            'Theatro Circo',
-                            $dateInfo['start_date'],
-                            $dateInfo['end_date']
-                        )) {
-                            $eventsScraped++;
-                        }
+                    $title    = $this->buildTitle($ev);
+                    $dateInfo = $this->parseDateString($ev['date'] ?? '');
+
+                    if (!$title || !$dateInfo) continue;
+
+                    // Skip events more than 7 days in the past
+                    if (strtotime($dateInfo['start']) < $cutoff) continue;
+
+                    $imageUrl = ($ev['image'] && $ev['image'] !== 'false')
+                        ? $this->downloadImage($ev['image'])
+                        : null;
+
+                    $category = $this->normalizeCategory($ev['category_name'] ?? '');
+                    $url      = $ev['link'] ?? null;
+
+                    if ($this->saveEvent(
+                        $title,
+                        null,
+                        $dateInfo['start'],
+                        $category,
+                        $imageUrl,
+                        $url,
+                        'Theatro Circo',
+                        $dateInfo['start'],
+                        $dateInfo['end']
+                    )) {
+                        $eventsScraped++;
                     }
-                    
+
                 } catch (Exception $e) {
-                    $errors[] = "Error processing event: " . $e->getMessage();
+                    $errors[] = 'Error processing event: ' . $e->getMessage();
                 }
             }
-            
+
             $this->updateLastScraped();
-            
-            return [
-                'events_scraped' => $eventsScraped,
-                'errors' => $errors
-            ];
-            
+
+            return ['events_scraped' => $eventsScraped, 'errors' => $errors];
+
         } catch (Exception $e) {
             return ['error' => $e->getMessage()];
         }
     }
-    
-    private function extractEventTitle($xpath, $eventNode) {
-        // For link nodes, use the link text or look for nested title elements
-        $title = trim($eventNode->textContent);
-        
-        if (strlen($title) > 5) {
-            // Clean up the title - remove extra whitespace and unwanted text
-            $title = preg_replace('/\s+/', ' ', $title);
-            $title = preg_replace('/Mais Informação.*$/i', '', $title);
-            $title = preg_replace('/Comprar Bilhete.*$/i', '', $title);
-            $title = trim($title);
-            
-            // Skip if it's just a date or navigation text
-            if (!preg_match('/^\d+/', $title) && 
-                !preg_match('/^(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i', $title) &&
-                strlen($title) > 8) {
-                return $title;
-            }
-        }
-        
-        // Look for title in parent/sibling elements
-        $parent = $eventNode->parentNode;
-        if ($parent) {
-            $titleElements = $xpath->query('.//h1 | .//h2 | .//h3 | .//h4 | .//*[contains(@class, "title")]', $parent);
-            foreach ($titleElements as $titleEl) {
-                $parentTitle = trim($titleEl->textContent);
-                if (strlen($parentTitle) > 5 && !preg_match('/^\d+/', $parentTitle)) {
-                    return $parentTitle;
-                }
-            }
-        }
-        
-        return null;
+
+    // -----------------------------------------------------------------------
+
+    private function buildTitle(array $ev): ?string {
+        $main = html_entity_decode(trim($ev['line_one_text'] ?? $ev['title'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $sub  = html_entity_decode(trim($ev['line_two_text'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        if (!$main) return null;
+        return $sub ? "$main — $sub" : $main;
     }
-    
-    private function extractEventUrl($xpath, $eventNode) {
-        $href = $eventNode->getAttribute('href');
-        
-        if ($href && strpos($href, 'programacultural') !== false) {
-            return strpos($href, 'http') === 0 ? $href : 'https://www.theatrocirco.com' . $href;
-        }
-        
-        return null;
-    }
-    
-    private function extractDateInfo($xpath, $eventNode) {
-        // Look at the parent container and surrounding text for date information
-        $parent = $eventNode->parentNode;
-        $attempts = 0;
-        
-        while ($parent && $attempts < 3) {
-            $parentText = $parent->textContent;
-            
-            // Look for date ranges: "2 a 4 de Setembro 2025"
-            if (preg_match('/(\d{1,2})\s+a\s+(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/i', $parentText, $matches)) {
-                $startDay = $matches[1];
-                $endDay = $matches[2];
-                $month = $matches[3];
-                $year = $matches[4];
-                
-                $startDate = "$startDay de $month $year";
-                $endDate = "$endDay de $month $year";
-                
-                return [
-                    'date' => $this->parsePortugueseDate($startDate),
-                    'start_date' => $this->parsePortugueseDate($startDate),
-                    'end_date' => $this->parsePortugueseDate($endDate),
-                    'raw' => "$startDay a $endDay de $month $year"
-                ];
-            }
-            
-            // Look for single date: "15 de Janeiro 2025"
-            if (preg_match('/(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/i', $parentText, $matches)) {
-                $day = $matches[1];
-                $month = $matches[2];
-                $year = $matches[3];
-                
-                $dateText = "$day de $month $year";
-                $parsedDate = $this->parsePortugueseDate($dateText);
-                return [
-                    'date' => $parsedDate,
-                    'start_date' => $parsedDate,
-                    'end_date' => $parsedDate,
-                    'raw' => $dateText
-                ];
-            }
-            
-            // Try next parent
-            $parent = $parent->parentNode;
-            $attempts++;
-        }
-        
-        // Look in the full event node text
-        $fullText = $eventNode->textContent;
-        
-        // Check for date ranges in full text
-        if (preg_match('/(\d{1,2})\s+a\s+(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/i', $fullText, $matches)) {
-            $startDay = $matches[1];
-            $endDay = $matches[2];
-            $month = $matches[3];
-            $year = $matches[4];
-            
-            $startDate = "$startDay de $month $year";
-            $endDate = "$endDay de $month $year";
-            
-            return [
-                'date' => $this->parsePortugueseDate($startDate),
-                'start_date' => $this->parsePortugueseDate($startDate),
-                'end_date' => $this->parsePortugueseDate($endDate),
-                'raw' => "$startDay a $endDay de $month $year"
-            ];
-        }
-        
-        // Single date in full text
-        if (preg_match('/(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/i', $fullText, $matches)) {
-            $day = $matches[1];
-            $month = $matches[2];  
-            $year = $matches[3];
-            
-            $dateText = "$day de $month $year";
-            $parsedDate = $this->parsePortugueseDate($dateText);
-            return [
-                'date' => $parsedDate,
-                'start_date' => $parsedDate,
-                'end_date' => $parsedDate,
-                'raw' => $dateText
-            ];
-        }
-        
-        return ['date' => null, 'start_date' => null, 'end_date' => null, 'raw' => ''];
-    }
-    
-    private function extractCategory($xpath, $eventNode) {
-        // Look for category indicators in the surrounding content
-        $parent = $eventNode->parentNode;
-        
-        if ($parent) {
-            $text = strtolower($parent->textContent);
-            
-            // Common Theatro Circo categories
-            $categories = [
-                'teatro' => 'Teatro',
-                'música' => 'Música', 
-                'musica' => 'Música',
-                'dança' => 'Dança',
-                'danca' => 'Dança',
-                'cinema' => 'Cinema',
-                'literatura' => 'Literatura',
-                'exposição' => 'Exposição',
-                'exposicao' => 'Exposição',
-                'conferência' => 'Conferência',
-                'conferencia' => 'Conferência',
-                'workshop' => 'Workshop',
-                'concerto' => 'Música',
-                'espetáculo' => 'Espetáculo',
-                'espetaculo' => 'Espetáculo'
-            ];
-            
-            foreach ($categories as $keyword => $category) {
-                if (strpos($text, $keyword) !== false) {
-                    return $category;
-                }
-            }
-        }
-        
-        return 'Cultura';
-    }
-    
-    private function extractDescription($xpath, $eventNode) {
-        // Look for description in parent containers
-        $parent = $eventNode->parentNode;
-        
-        if ($parent) {
-            $descriptions = $xpath->query('.//*[contains(@class, "desc") or contains(@class, "content")]', $parent);
-            
-            foreach ($descriptions as $desc) {
-                $text = trim($desc->textContent);
-                if (strlen($text) > 20 && strlen($text) < 500) {
-                    return $text;
-                }
-            }
-        }
-        
-        return null;
-    }
-    
-    private function extractEventImage($eventUrl) {
-        if (!$eventUrl) return null;
-        
-        try {
-            $html = $this->fetchUrl($eventUrl);
-            if (!$html) return null;
-            
-            $dom = new DOMDocument();
-            libxml_use_internal_errors(true);
-            $dom->loadHTML($html);
-            libxml_clear_errors();
-            
-            $xpath = new DOMXPath($dom);
-            
-            // Look for event images
-            $imageSelectors = [
-                '//meta[@property="og:image"]/@content',
-                '//img[contains(@class, "evento")]/@src',
-                '//img[contains(@class, "agenda")]/@src',
-                '//img[contains(@src, "agenda")]/@src',
-                '//img[contains(@src, "evento")]/@src',
-                '//main//img[1]/@src',
-                '//article//img[1]/@src'
-            ];
-            
-            foreach ($imageSelectors as $selector) {
-                $nodes = $xpath->query($selector);
-                if ($nodes->length > 0) {
-                    $imageSrc = trim($nodes->item(0)->nodeValue);
-                    
-                    if ($imageSrc && !empty($imageSrc)) {
-                        // Make absolute URL
-                        if (strpos($imageSrc, 'http') !== 0) {
-                            if (strpos($imageSrc, '//') === 0) {
-                                $imageSrc = 'https:' . $imageSrc;
-                            } elseif (strpos($imageSrc, '/') === 0) {
-                                $imageSrc = 'https://www.theatrocirco.com' . $imageSrc;
-                            } else {
-                                $imageSrc = 'https://www.theatrocirco.com/' . $imageSrc;
-                            }
-                        }
-                        
-                        if ($this->isValidImageUrl($imageSrc)) {
-                            return $imageSrc;
-                        }
-                    }
-                }
-            }
-            
-        } catch (Exception $e) {
-            // Fail silently for images
-        }
-        
-        return null;
-    }
-    
-    private function parsePortugueseDate($dateString) {
-        if (!$dateString) return null;
-        
+
+    /**
+     * Parse TC date strings into ['start' => 'Y-m-d H:i:s', 'end' => 'Y-m-d H:i:s'].
+     *
+     * Formats seen:
+     *   "24 abril (sex)"
+     *   "1 e 2 abril (qua e qui)"
+     *   "17 a 24 abril"
+     *   "7 a 9 abril (ter a qui)"
+     *   "12 a 14 março (qui a sáb)"
+     *   "8 Agosto"
+     */
+    private function parseDateString(string $raw): ?array {
+        if (!$raw) return null;
+
         $months = [
-            'janeiro' => '01', 'fevereiro' => '02', 'março' => '03', 'abril' => '04',
-            'maio' => '05', 'junho' => '06', 'julho' => '07', 'agosto' => '08',
-            'setembro' => '09', 'outubro' => '10', 'novembro' => '11', 'dezembro' => '12'
+            'janeiro'=>'01','fevereiro'=>'02','março'=>'03','marco'=>'03',
+            'abril'=>'04','maio'=>'05','junho'=>'06','julho'=>'07',
+            'agosto'=>'08','setembro'=>'09','outubro'=>'10','novembro'=>'11','dezembro'=>'12',
         ];
-        
-        $dateString = strtolower(trim($dateString));
-        
-        // Pattern: "15 de janeiro 2025"
-        if (preg_match('/(\d{1,2})\s+de\s+(\w+)\s+(\d{4})/', $dateString, $matches)) {
-            $day = str_pad($matches[1], 2, '0', STR_PAD_LEFT);
-            $monthName = $matches[2];
-            $year = $matches[3];
-            
-            $month = '01';
-            foreach ($months as $name => $num) {
-                if (strpos($monthName, $name) === 0 || strpos($name, $monthName) === 0) {
-                    $month = $num;
-                    break;
-                }
+
+        $s = strtolower(trim($raw));
+
+        // Strip day-of-week annotations like "(sex)" or "(ter a qui)"
+        $s = preg_replace('/\([^)]*\)/', '', $s);
+        $s = trim($s);
+
+        $month = null;
+        foreach ($months as $name => $num) {
+            if (strpos($s, $name) !== false) {
+                $month = $num;
+                $s     = trim(str_replace($name, '', $s));
+                break;
             }
-            
-            return "$year-$month-$day 19:30:00"; // Default to 7:30 PM for theatre
         }
-        
-        return null;
+        if (!$month) return null;
+
+        // Extract day numbers remaining in $s
+        preg_match_all('/\d+/', $s, $dayMatches);
+        $days = $dayMatches[0];
+
+        if (empty($days)) return null;
+
+        $startDay = (int)$days[0];
+        $endDay   = (int)($days[count($days) - 1]);
+
+        $year     = $this->inferYear($month, $startDay);
+        $start    = sprintf('%04d-%02d-%02d 19:30:00', $year, $month, $startDay);
+        $end      = sprintf('%04d-%02d-%02d 19:30:00', $year, $month, $endDay);
+
+        return ['start' => $start, 'end' => $end];
     }
-    
-    private function isValidImageUrl($url) {
-        if (!$url) return false;
-        
-        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
-        $lowerUrl = strtolower($url);
-        
-        foreach ($imageExtensions as $ext) {
-            if (strpos($lowerUrl, '.' . $ext) !== false) {
-                return true;
-            }
+
+    /**
+     * Choose current or next year so the resulting date is not >60 days in the past.
+     */
+    private function inferYear(string $month, int $day): int {
+        $year     = (int)date('Y');
+        $ts       = mktime(0, 0, 0, (int)$month, $day, $year);
+        $cutoff   = strtotime('-60 days');
+
+        if ($ts < $cutoff) {
+            $year++;
         }
-        
-        return false;
+
+        return $year;
+    }
+
+    private function normalizeCategory(string $cat): string {
+        $map = [
+            'música'           => 'Música',
+            'musica'           => 'Música',
+            'cineconcerto'     => 'Música',
+            'ópera'            => 'Ópera',
+            'opera'            => 'Ópera',
+            'teatro'           => 'Teatro',
+            'dança'            => 'Dança',
+            'danca'            => 'Dança',
+            'dança e música'   => 'Dança',
+            'cinema'           => 'Cinema',
+            'mediação'         => 'Mediação',
+            'mediacao'         => 'Mediação',
+            'multidisciplinar' => 'Multidisciplinar',
+            'exposição'        => 'Exposição',
+            'exposicao'        => 'Exposição',
+            'instalação'       => 'Exposição',
+            'infantojuvenil'   => 'Infantojuvenil',
+            'conversa'         => 'Conversa',
+            'workshop'         => 'Workshop',
+            'oficina'          => 'Workshop',
+            'performance'      => 'Performance',
+            'noite branca'     => 'Noite Branca',
+            'outros'           => 'Outros',
+            'sem categoria'    => 'Cultura',
+        ];
+
+        $key = strtolower(trim($cat));
+        return $map[$key] ?? ucfirst($cat) ?: 'Cultura';
     }
 }
