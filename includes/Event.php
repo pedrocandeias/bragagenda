@@ -77,6 +77,67 @@ class Event {
         return $stmt->fetchColumn();
     }
     
+    public function getEventsByDateRange($fromDate, $toDate, $location = '', $category = '', $limit = null, $offset = 0, $search = '') {
+        $sql = "SELECT *,
+                       COALESCE(start_date, event_date) as start_date,
+                       COALESCE(end_date, event_date) as end_date
+                FROM events
+                WHERE DATE(event_date) BETWEEN ? AND ?
+                AND (hidden IS NULL OR hidden = 0)";
+        $params = [$fromDate, $toDate];
+
+        if ($location) {
+            $sql .= " AND location = ?";
+            $params[] = $location;
+        }
+        if ($category) {
+            $sql .= " AND category = ?";
+            $params[] = $category;
+        }
+        if ($search) {
+            $sql .= " AND (title LIKE ? OR location LIKE ?)";
+            $params[] = '%' . $search . '%';
+            $params[] = '%' . $search . '%';
+        }
+
+        $sql .= " ORDER BY featured DESC, event_date ASC";
+
+        if ($limit) {
+            $sql .= " LIMIT ? OFFSET ?";
+            $params[] = $limit;
+            $params[] = $offset;
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getEventsCountByDateRange($fromDate, $toDate, $location = '', $category = '', $search = '') {
+        $sql = "SELECT COUNT(*) FROM events
+                WHERE DATE(event_date) BETWEEN ? AND ?
+                AND (hidden IS NULL OR hidden = 0)";
+        $params = [$fromDate, $toDate];
+
+        if ($location) {
+            $sql .= " AND location = ?";
+            $params[] = $location;
+        }
+        if ($category) {
+            $sql .= " AND category = ?";
+            $params[] = $category;
+        }
+        if ($search) {
+            $sql .= " AND (title LIKE ? OR location LIKE ?)";
+            $params[] = '%' . $search . '%';
+            $params[] = '%' . $search . '%';
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchColumn();
+    }
+
     public function getAllCategories() {
         $stmt = $this->db->query("SELECT DISTINCT category FROM events WHERE category IS NOT NULL AND category != '' ORDER BY category");
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -87,11 +148,11 @@ class Event {
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
     
-    public function createEvent($title, $description, $eventDate, $category, $image = null, $url = null, $sourceId = null, $location = null) {
-        $sql = "INSERT INTO events (title, description, event_date, category, location, image, url, source_id) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+    public function createEvent($title, $description, $eventDate, $category, $image = null, $url = null, $sourceId = null, $location = null, $createdBy = null, $startDate = null, $endDate = null) {
+        $sql = "INSERT INTO events (title, description, event_date, start_date, end_date, category, location, image, url, source_id, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$title, $description, $eventDate, $category, $location, $image, $url, $sourceId]);
+        return $stmt->execute([$title, $description, $eventDate, $startDate ?: $eventDate, $endDate ?: $eventDate, $category, $location, $image, $url, $sourceId, $createdBy]);
     }
     
     public function updateEvent($id, $title, $description, $eventDate, $category, $image = null, $url = null, $location = null) {

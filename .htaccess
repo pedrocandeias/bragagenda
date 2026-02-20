@@ -1,5 +1,23 @@
 RewriteEngine On
 
+# Single event page: /evento/123
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^evento/([0-9]+)/?$ /evento.php?id=$1 [QSA,L]
+
+# Clean URLs: /MM/YYYY[/filter-slug[/location-slug]]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([0-9]{1,2})/([0-9]{4})/([^/]+)/([^/]+)/?$ /index.php?month=$1&year=$2&category=$3&location=$4 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([0-9]{1,2})/([0-9]{4})/([^/]+)/?$ /index.php?month=$1&year=$2&category=$3 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([0-9]{1,2})/([0-9]{4})/?$ /index.php?month=$1&year=$2 [QSA,L]
+
 # Security headers
 Header always set X-Content-Type-Options nosniff
 Header always set X-Frame-Options DENY

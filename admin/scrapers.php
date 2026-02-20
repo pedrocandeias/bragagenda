@@ -1,6 +1,9 @@
 <?php
 require_once '../config.php';
 require_once '../includes/Database.php';
+require_once '../includes/Auth.php';
+
+Auth::requireRole('admin');
 
 $db  = new Database();
 $pdo = $db->getConnection();
@@ -70,25 +73,7 @@ $activeSources = array_filter($sources, fn($s) => $s['active']);
 </head>
 <body>
 <div class="container-fluid">
-    <header class="py-4 border-bottom">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h1>Scrapers</h1>
-            <nav class="d-flex gap-2 flex-wrap">
-                <a href="../index.php" class="btn btn-outline-primary">
-                    <i class="bi bi-globe"></i> Ver site
-                </a>
-                <a href="index.php" class="btn btn-outline-secondary">
-                    <i class="bi bi-calendar-event"></i> Eventos
-                </a>
-                <a href="categories.php" class="btn btn-outline-secondary">
-                    <i class="bi bi-tags"></i> Categorias
-                </a>
-                <a href="venues.php" class="btn btn-outline-info">
-                    <i class="bi bi-geo-alt"></i> Locais
-                </a>
-            </nav>
-        </div>
-    </header>
+    <?php include '_nav.php'; ?>
 
     <main class="py-4">
 

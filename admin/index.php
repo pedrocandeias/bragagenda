@@ -2,7 +2,11 @@
 require_once '../config.php';
 require_once '../includes/Database.php';
 require_once '../includes/Event.php';
+require_once '../includes/Auth.php';
 
+Auth::requireLogin();
+
+$currentUser = Auth::currentUser();
 $db = new Database();
 $eventModel = new Event($db);
 
@@ -114,28 +118,7 @@ $messageType = $_GET['type'] ?? 'success';
 </head>
 <body>
     <div class="container-fluid">
-        <header class="py-4 border-bottom">
-            <div class="d-flex justify-content-between align-items-center flex-wrap">
-                <h1>Admin - Braga Agenda</h1>
-                <nav class="d-flex gap-2 flex-wrap">
-                    <a href="../index.php" class="btn btn-outline-primary">
-                        <i class="bi bi-globe"></i> Ver site
-                    </a>
-                    <a href="categories.php" class="btn btn-outline-secondary">
-                        <i class="bi bi-tags"></i> Categorias
-                    </a>
-                    <a href="venues.php" class="btn btn-outline-info">
-                        <i class="bi bi-geo-alt"></i> Locais
-                    </a>
-                    <a href="scrapers.php" class="btn btn-outline-dark">
-                        <i class="bi bi-cloud-download"></i> Scrapers
-                    </a>
-                    <a href="add-event.php" class="btn btn-success">
-                        <i class="bi bi-plus-lg"></i> Adicionar evento
-                    </a>
-                </nav>
-            </div>
-        </header>
+        <?php include '_nav.php'; ?>
 
         <main class="py-4">
             <?php if ($message): ?>
@@ -299,28 +282,38 @@ $messageType = $_GET['type'] ?? 'success';
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
+                                                    <?php
+                                                    $canEdit = Auth::hasMinRole('admin') ||
+                                                               (!empty($event['created_by']) && $event['created_by'] == $currentUser['id']);
+                                                    ?>
                                                     <div class="btn-group btn-group-sm">
-                                                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                        <?php if ($canEdit): ?>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm"
                                                                 title="Editar" onclick="editEvent(<?= $event['id'] ?>)">
                                                             <i class="bi bi-pencil"></i>
                                                         </button>
-                                                        <button type="button" 
-                                                                class="btn <?= !empty($event['featured']) ? 'btn-warning' : 'btn-outline-warning' ?> btn-sm" 
+                                                        <button type="button"
+                                                                class="btn <?= !empty($event['featured']) ? 'btn-warning' : 'btn-outline-warning' ?> btn-sm"
                                                                 title="<?= !empty($event['featured']) ? 'Remover destaque' : 'Destacar evento' ?>"
                                                                 onclick="toggleEventStatus(<?= $event['id'] ?>, 'toggle-featured')">
                                                             <i class="bi bi-star<?= !empty($event['featured']) ? '-fill' : '' ?>"></i>
                                                         </button>
-                                                        <button type="button" 
-                                                                class="btn <?= !empty($event['hidden']) ? 'btn-secondary' : 'btn-outline-secondary' ?> btn-sm" 
+                                                        <button type="button"
+                                                                class="btn <?= !empty($event['hidden']) ? 'btn-secondary' : 'btn-outline-secondary' ?> btn-sm"
                                                                 title="<?= !empty($event['hidden']) ? 'Mostrar evento' : 'Ocultar evento' ?>"
                                                                 onclick="toggleEventStatus(<?= $event['id'] ?>, 'toggle-hidden')">
                                                             <i class="bi bi-eye<?= !empty($event['hidden']) ? '-slash' : '' ?>"></i>
                                                         </button>
-                                                        <a href="delete-event.php?id=<?= $event['id'] ?>" 
+                                                        <a href="delete-event.php?id=<?= $event['id'] ?>"
                                                            class="btn btn-outline-danger btn-sm" title="Eliminar"
                                                            onclick="return confirm('Tem certeza?')">
                                                             <i class="bi bi-trash"></i>
                                                         </a>
+                                                        <?php else: ?>
+                                                        <span class="btn btn-sm btn-light disabled" title="Sem permissão">
+                                                            <i class="bi bi-lock"></i>
+                                                        </span>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                             </tr>

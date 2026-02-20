@@ -2,6 +2,11 @@
 require_once '../config.php';
 require_once '../includes/Database.php';
 require_once '../includes/Event.php';
+require_once '../includes/Auth.php';
+
+Auth::requireLoginAjax();
+
+$currentUser = Auth::currentUser();
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -37,6 +42,13 @@ try {
     if (!$event) {
         http_response_code(404);
         echo json_encode(['error' => 'Event not found']);
+        exit;
+    }
+
+    // Ownership check for contributors
+    if (!Auth::hasMinRole('admin') && (empty($event['created_by']) || $event['created_by'] != $currentUser['id'])) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Sem permissão']);
         exit;
     }
     

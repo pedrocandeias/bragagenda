@@ -173,6 +173,32 @@ bragagenda/
 └── uploads/               # Event images (gitignored)
 ```
 
+## Versioning & Changelog
+
+After completing any meaningful change (new feature, bug fix, scraper, schema migration, etc.):
+
+1. **Update `CHANGELOG.md`** — add an entry under `## [Unreleased]` using the existing format:
+   - `### Added` — new files, features, scrapers
+   - `### Changed` — modifications to existing behaviour
+   - `### Fixed` — bug fixes
+   - `### Removed` — deleted files or dropped features
+   - Each line: `` `filename` — one-line description of what changed and why ``
+   - **Every entry must include the date of change** in `YYYY-MM-DD` format at the end: `` `filename` — description (2026-02-20) ``
+
+2. **Bump the version in `config.php`** — update (or add if missing) the `APP_VERSION` constant:
+   ```php
+   define('APP_VERSION', '0.5.0');
+   ```
+   Follow semver: `MAJOR.MINOR.PATCH`
+   - **PATCH** (`0.4.0 → 0.4.1`) — bug fixes, minor scraper tweaks, copy changes
+   - **MINOR** (`0.4.0 → 0.5.0`) — new features, new scrapers, new admin pages, schema additions
+   - **MAJOR** (`0.x → 1.0`) — breaking changes or large architectural rewrites
+
+3. When a release is tagged, move `[Unreleased]` entries into a new versioned section:
+   ```
+   ## [0.5.0] — YYYY-MM-DD
+   ```
+
 ## Key Conventions
 - Portuguese categories: Música, Teatro, Dança, Cinema, Arte, etc.
 - Images stored as URL strings, not uploaded files

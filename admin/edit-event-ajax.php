@@ -2,6 +2,11 @@
 require_once '../config.php';
 require_once '../includes/Database.php';
 require_once '../includes/Event.php';
+require_once '../includes/Auth.php';
+
+Auth::requireLoginAjax();
+
+$currentUser = Auth::currentUser();
 
 header('Content-Type: application/json');
 
@@ -25,6 +30,13 @@ $event = $eventModel->getEventById($eventId);
 
 if (!$event) {
     echo json_encode(['success' => false, 'message' => 'Event not found']);
+    exit;
+}
+
+// Ownership check for contributors
+if (!Auth::hasMinRole('admin') && (empty($event['created_by']) || $event['created_by'] != $currentUser['id'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Sem permissão para editar este evento']);
     exit;
 }
 

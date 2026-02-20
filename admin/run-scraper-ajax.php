@@ -2,6 +2,9 @@
 require_once '../config.php';
 require_once '../includes/Database.php';
 require_once '../scrapers/ScraperManager.php';
+require_once '../includes/Auth.php';
+
+Auth::requireRoleAjax('admin');
 
 ob_start();
 header('Content-Type: application/json');

@@ -2,6 +2,9 @@
 require_once '../config.php';
 require_once '../includes/Database.php';
 require_once '../includes/Event.php';
+require_once '../includes/Auth.php';
+
+Auth::requireRole('admin');
 
 $db = new Database();
 $eventModel = new Event($db);
@@ -109,22 +112,7 @@ $allVenues = array_column($venues, 'location');
 </head>
 <body>
     <div class="container-fluid">
-        <header class="py-4 border-bottom">
-            <div class="d-flex justify-content-between align-items-center">
-                <h1>Gestão de Locais</h1>
-                <nav class="d-flex gap-2">
-                    <a href="index.php" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-left"></i> Voltar
-                    </a>
-                    <a href="categories.php" class="btn btn-outline-info">
-                        <i class="bi bi-tags"></i> Categorias
-                    </a>
-                    <a href="../index.php" class="btn btn-outline-primary">
-                        <i class="bi bi-globe"></i> Ver site
-                    </a>
-                </nav>
-            </div>
-        </header>
+        <?php include '_nav.php'; ?>
 
         <main class="py-4">
             <?php if ($message): ?>

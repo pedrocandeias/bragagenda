@@ -2,6 +2,9 @@
 require_once '../config.php';
 require_once '../includes/Database.php';
 require_once '../includes/Event.php';
+require_once '../includes/Auth.php';
+
+Auth::requireLoginAjax();
 
 header('Content-Type: application/json');
 

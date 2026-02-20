@@ -1,4 +1,5 @@
 <?php
+define('APP_VERSION', '0.6.0');
 define('DB_PATH', __DIR__ . '/data/events.db');
 define('UPLOAD_PATH', __DIR__ . '/uploads/');
 define('BASE_URL', '/');

@@ -133,18 +133,41 @@ class TheatroCircoScraper extends BaseScraper {
     }
 
     /**
-     * Choose current or next year so the resulting date is not >60 days in the past.
+     * Pick the year (prev / current / next) whose date is closest to today,
+     * excluding candidates that are more than 180 days in the past.
+     * This handles events whose month/day appear in the TC JSON after the event
+     * has already passed — e.g. "8 novembro" should resolve to Nov 2025, not Nov 2026.
      */
     private function inferYear(string $month, int $day): int {
+        $now      = time();
         $year     = (int)date('Y');
-        $ts       = mktime(0, 0, 0, (int)$month, $day, $year);
-        $cutoff   = strtotime('-60 days');
+        $pastLimit = strtotime('-180 days');
 
-        if ($ts < $cutoff) {
-            $year++;
+        $candidates = [
+            $year - 1 => mktime(0, 0, 0, (int)$month, $day, $year - 1),
+            $year     => mktime(0, 0, 0, (int)$month, $day, $year),
+            $year + 1 => mktime(0, 0, 0, (int)$month, $day, $year + 1),
+        ];
+
+        // Drop dates too far in the past
+        $valid = array_filter($candidates, fn($ts) => $ts >= $pastLimit);
+
+        if (empty($valid)) {
+            return $year + 1; // shouldn't happen
         }
 
-        return $year;
+        // Return the year whose date is closest to today
+        $best = null;
+        $bestDiff = PHP_INT_MAX;
+        foreach ($valid as $y => $ts) {
+            $diff = abs($ts - $now);
+            if ($diff < $bestDiff) {
+                $bestDiff = $diff;
+                $best = $y;
+            }
+        }
+
+        return $best;
     }
 
     private function normalizeCategory(string $cat): string {

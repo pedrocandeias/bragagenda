@@ -2,7 +2,11 @@
 require_once '../config.php';
 require_once '../includes/Database.php';
 require_once '../includes/Event.php';
+require_once '../includes/Auth.php';
 
+Auth::requireLogin();
+
+$currentUser = Auth::currentUser();
 $db = new Database();
 $eventModel = new Event($db);
 
@@ -11,6 +15,12 @@ $event = $eventModel->getEventById($eventId);
 
 if (!$event) {
     header('Location: index.php');
+    exit;
+}
+
+// Ownership check for contributors
+if (!Auth::hasMinRole('admin') && (empty($event['created_by']) || $event['created_by'] != $currentUser['id'])) {
+    header('Location: index.php?message=' . urlencode('Sem permissão para editar este evento.') . '&type=error');
     exit;
 }
 

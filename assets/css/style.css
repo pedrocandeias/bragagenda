@@ -75,6 +75,74 @@ a { color: inherit; }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
 
+/* Interval tabs */
+.interval-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 0.6rem;
+    background: #f0f0f0;
+    border-radius: 100px;
+    padding: 3px;
+}
+
+.interval-tab {
+    flex: 1;
+    text-align: center;
+    padding: 0.25rem 0.4rem;
+    border-radius: 100px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-decoration: none;
+    color: #777;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.interval-tab.active { background: #000; color: #fff; }
+.interval-tab:hover:not(.active) { color: #000; }
+
+/* Range date picker */
+.range-picker {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.range-date-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-family: inherit;
+    outline: none;
+    background: #fff;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+}
+.range-date-input:focus { border-color: #000; }
+
+.range-picker-sep { font-size: 0.75rem; color: #999; flex-shrink: 0; }
+
+.range-picker-btn {
+    padding: 0.35rem 0.65rem;
+    background: #000;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+}
+.range-picker-btn:hover { opacity: 0.75; }
+
 /* Month nav inside sidebar */
 .sidebar-month-nav {
     display: flex;
@@ -83,6 +151,13 @@ a { color: inherit; }
     margin-bottom: 1.25rem;
     padding-bottom: 1.25rem;
     border-bottom: 1px solid #e5e5e5;
+}
+
+/* When a range picker follows, drop the nav's own bottom border */
+.sidebar-month-nav--has-range {
+    border-bottom: none;
+    padding-bottom: 0.4rem;
+    margin-bottom: 0;
 }
 
 .month-nav-btn {
@@ -424,6 +499,171 @@ a { color: inherit; }
 .page-link-item.active  { background: #000; color: #fff; border-color: #000; }
 .page-link-item.disabled { color: #bbb; pointer-events: none; }
 
+/* ── Single event page ──────────────────────────────────────────── */
+.event-detail-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 2rem 4rem;
+}
+
+/* Breadcrumb */
+.event-detail-breadcrumb {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.event-detail-breadcrumb a {
+    color: #888;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.event-detail-breadcrumb a:hover { color: #000; }
+.breadcrumb-sep { color: #ccc; }
+
+/* Hero */
+.event-detail-hero {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 3rem;
+    align-items: start;
+    margin-bottom: 3rem;
+    padding-bottom: 3rem;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.event-detail-hero-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding-top: 0.5rem;
+}
+
+.event-detail-category {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #888;
+    margin-bottom: 1rem;
+}
+
+.event-detail-title {
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    margin-bottom: 1.25rem;
+}
+
+.event-detail-venue {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    color: #555;
+}
+.event-detail-venue i { font-size: 0.85rem; }
+
+.event-detail-hero-image {
+    position: sticky;
+    top: 1.5rem;
+}
+
+.event-detail-img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    display: block;
+    background: #f0f0f0;
+}
+
+/* Body: description + meta sidebar */
+.event-detail-body-wrap {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 3rem;
+    margin-bottom: 4rem;
+}
+
+.event-detail-description {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #222;
+}
+
+.event-detail-description p   { margin-bottom: 1em; }
+.event-detail-description ul,
+.event-detail-description ol  { margin: 0 0 1em 1.5em; }
+.event-detail-description a   { color: #000; text-underline-offset: 2px; }
+.event-detail-no-desc         { color: #aaa; font-style: italic; }
+
+/* Meta sidebar */
+.event-meta-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.event-meta-row {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #e5e5e5;
+}
+.event-meta-row:last-child { border-bottom: none; }
+
+.event-meta-row dt {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #999;
+    margin-bottom: 0.25rem;
+}
+.event-meta-row dt i { font-size: 0.75rem; }
+
+.event-meta-row dd {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #000;
+    margin: 0;
+}
+.event-meta-row dd a {
+    color: #000;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.event-meta-row dd a:hover { text-decoration: none; }
+
+/* Related events */
+.event-detail-related {
+    border-top: 2px solid #000;
+    padding-top: 2rem;
+}
+
+.event-detail-related-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    margin-bottom: 1.5rem;
+}
+
+.event-detail-related-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+}
+
 /* ── Footer ─────────────────────────────────────────────────────── */
 .site-footer {
     border-top: 1px solid #e5e5e5;
@@ -496,4 +736,23 @@ a { color: inherit; }
 
 @media (max-width: 480px) {
     .events-grid { grid-template-columns: 1fr; }
+}
+
+/* Single event — tablet */
+@media (max-width: 900px) {
+    .event-detail-hero {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    .event-detail-hero-image { position: static; }
+    .event-detail-title      { font-size: 2rem; }
+    .event-detail-body-wrap  { grid-template-columns: 1fr; gap: 2rem; }
+    .event-detail-related-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Single event — mobile */
+@media (max-width: 480px) {
+    .event-detail-page  { padding: 1rem 1rem 3rem; }
+    .event-detail-title { font-size: 1.6rem; letter-spacing: -0.5px; }
+    .event-detail-related-grid { grid-template-columns: 1fr; }
 }

@@ -47,11 +47,15 @@ class Database {
         CREATE INDEX IF NOT EXISTS idx_events_url ON events(url);
         ";
         
-        // Add new columns to existing tables
+        // Add new columns and tables to existing schema
         $this->addEventHashColumn();
         $this->addLocationColumn();
         $this->addDateRangeColumns();
         $this->addVisibilityColumns();
+        $this->addSettingsTable();
+        $this->addUsersTable();
+        $this->addCreatedByColumn();
+        $this->addConfirmationTokenColumns();
         
         $this->db->exec($sql);
     }
@@ -129,6 +133,67 @@ class Database {
         }
     }
     
+    private function addSettingsTable() {
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+    }
+
+    private function addUsersTable() {
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME
+            )
+        ");
+    }
+
+    private function addConfirmationTokenColumns() {
+        try {
+            $stmt = $this->db->query("PRAGMA table_info(users)");
+            $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $names = array_column($columns, 'name');
+
+            if (!in_array('confirmation_token', $names)) {
+                $this->db->exec("ALTER TABLE users ADD COLUMN confirmation_token TEXT");
+            }
+            if (!in_array('token_expires_at', $names)) {
+                $this->db->exec("ALTER TABLE users ADD COLUMN token_expires_at DATETIME");
+            }
+        } catch (Exception $e) {
+            // Ignore — columns may already exist
+        }
+    }
+
+    private function addCreatedByColumn() {
+        try {
+            $stmt = $this->db->query("PRAGMA table_info(events)");
+            $columns = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $hasColumn = false;
+            foreach ($columns as $col) {
+                if ($col['name'] === 'created_by') {
+                    $hasColumn = true;
+                    break;
+                }
+            }
+            if (!$hasColumn) {
+                $this->db->exec("ALTER TABLE events ADD COLUMN created_by INTEGER REFERENCES users(id)");
+            }
+        } catch (Exception $e) {
+            // Ignore
+        }
+    }
+
     private function addVisibilityColumns() {
         try {
             // Check if hidden and featured columns exist
