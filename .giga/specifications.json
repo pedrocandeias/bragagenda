@@ -1,0 +1,22 @@
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete system overview documenting the event aggregation architecture, scraping framework, and component interactions"
+  },
+  {
+    "fileName": "scraper-architecture.mdc",
+    "description": "Detailed documentation of the scraping system architecture, including BaseScraper inheritance hierarchy, venue-specific implementations, and the ScraperManager orchestration"
+  },
+  {
+    "fileName": "event-data-model.mdc",
+    "description": "Comprehensive documentation of the Event data model, database schema, relationships, and the specialized fields handling Portuguese cultural events"
+  },
+  {
+    "fileName": "event-processing-algorithms.mdc",
+    "description": "Details of core algorithms including Portuguese date parsing, category normalization, duplicate detection, and venue-specific content extraction strategies"
+  },
+  {
+    "fileName": "data-flow.mdc",
+    "description": "Documentation of data flow through the system: from venue scraping through normalization, deduplication, storage, and presentation"
+  }
+]
